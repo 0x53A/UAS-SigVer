@@ -8,6 +8,7 @@ eframe = { version = "0.31.1", features = ["default_fonts", "glow", "persistence
 egui = "0.31.1"
 env_logger = "0.11.8"
 log = "0.4.27"
+rustfft = { version = "6.2.0", features = ["wasm_simd"] }
 serde = { version = "1.0.219", features = ["derive"] }
 wasm-bindgen-futures = "0.4.50"
 web-sys = "0.3.77"
