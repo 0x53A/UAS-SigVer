@@ -178,7 +178,7 @@ impl eframe::App for AliasApp {
                     );
                 }
 
-                draw_axis_labels(&painter, rect, "Time", "Amplitude");
+                draw_axis_labels(painter, rect, "Time", "Amplitude");
 
                 // Add legend
                 painter.rect_filled(
@@ -264,7 +264,7 @@ impl eframe::App for AliasApp {
                     );
                 }
 
-                draw_axis_labels(&painter, rect, "Time", "Amplitude");
+                draw_axis_labels(painter, rect, "Time", "Amplitude");
 
                 // Add nyquist frequency label
                 let nyquist_freq = self.sampling_frequency / 2.0;
@@ -350,7 +350,7 @@ impl eframe::App for AliasApp {
                     let window = a0 - a1 * (2.0 * PI * i as f32 / (window_len - 1) as f32).cos()
                         + a2 * (4.0 * PI * i as f32 / (window_len - 1) as f32).cos()
                         - a3 * (6.0 * PI * i as f32 / (window_len - 1) as f32).cos();
-                    fft_input[i] = fft_input[i] * window;
+                    fft_input[i] *= window;
                 }
 
                 // Perform FFT
@@ -371,7 +371,7 @@ impl eframe::App for AliasApp {
                 let num_buckets = 200; // Increased from before
 
                 // Calculate magnitudes
-                let mut magnitudes: Vec<f32> = fft_output[..display_points]
+                let magnitudes: Vec<f32> = fft_output[..display_points]
                     .iter()
                     .map(|c| c.norm() / fft_size as f32)
                     .collect();
@@ -483,7 +483,7 @@ impl eframe::App for AliasApp {
 
                     // Add aliased frequency label if applicable
                     if self.signal_frequency > self.sampling_frequency / 2.0 {
-                        let alias_freq = (self.signal_frequency % self.sampling_frequency);
+                        let alias_freq = self.signal_frequency % self.sampling_frequency;
                         let alias_freq = if alias_freq > self.sampling_frequency / 2.0 {
                             self.sampling_frequency - alias_freq
                         } else {
@@ -511,7 +511,7 @@ impl eframe::App for AliasApp {
                     }
                 }
 
-                draw_axis_labels(&painter, rect, "Frequency (Hz)", "Magnitude");
+                draw_axis_labels(painter, rect, "Frequency (Hz)", "Magnitude");
 
                 // Mark Nyquist frequency if it's in our display range
                 let nyquist_freq = self.sampling_frequency / 2.0;
@@ -650,7 +650,7 @@ impl eframe::App for AliasApp {
                     );
                 }
 
-                draw_axis_labels(&painter, rect, "Time", "Amplitude");
+                draw_axis_labels(painter, rect, "Time", "Amplitude");
 
                 // Add legend
                 painter.rect_filled(
@@ -700,7 +700,7 @@ impl eframe::App for AliasApp {
 
             // Add aliasing warning in its own area below the plot
             if self.signal_frequency > self.sampling_frequency / 2.0 {
-                let alias_freq = (self.signal_frequency % self.sampling_frequency);
+                let alias_freq = self.signal_frequency % self.sampling_frequency;
                 let alias_freq = if alias_freq > self.sampling_frequency / 2.0 {
                     self.sampling_frequency - alias_freq
                 } else {
