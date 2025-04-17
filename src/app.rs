@@ -784,7 +784,7 @@ impl AliasApp {
                             rect.height() / 2.0 - y * (rect.height() / 2.0),
                         ),
                     4.0,
-                    Color32::BLUE,
+                    Color32::ORANGE,
                 );
             }
 
@@ -819,7 +819,7 @@ impl AliasApp {
             painter.circle_filled(
                 egui::Pos2::new(rect.right() - 140.0, rect.top() + 60.0),
                 4.0,
-                Color32::BLUE,
+                Color32::ORANGE,
             );
 
             painter.text(
