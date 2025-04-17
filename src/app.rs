@@ -774,13 +774,27 @@ impl AliasApp {
                 );
             }
 
+            // Draw sample points
+            let sample_points = self.calculate_sample_points();
+            for (x, y) in &sample_points {
+                painter.circle_filled(
+                    rect.left_top()
+                        + vec2(
+                            *x / (2.0 * PI) * rect.width(),
+                            rect.height() / 2.0 - y * (rect.height() / 2.0),
+                        ),
+                    4.0,
+                    Color32::BLUE,
+                );
+            }
+
             draw_axis_labels(painter, rect, "Time", "Amplitude");
 
             // Add legend
             painter.rect_filled(
                 egui::Rect::from_min_max(
                     egui::Pos2::new(rect.right() - 160.0, rect.top() + 10.0),
-                    egui::Pos2::new(rect.right() - 10.0, rect.top() + 50.0),
+                    egui::Pos2::new(rect.right() - 10.0, rect.top() + 70.0),
                 ),
                 3.0,
                 Color32::from_rgba_premultiplied(40, 40, 40, 200),
@@ -802,6 +816,12 @@ impl AliasApp {
                 Stroke::new(2.0, Color32::RED),
             );
 
+            painter.circle_filled(
+                egui::Pos2::new(rect.right() - 140.0, rect.top() + 60.0),
+                4.0,
+                Color32::BLUE,
+            );
+
             painter.text(
                 egui::Pos2::new(rect.right() - 120.0, rect.top() + 20.0),
                 egui::Align2::LEFT_CENTER,
@@ -814,6 +834,14 @@ impl AliasApp {
                 egui::Pos2::new(rect.right() - 120.0, rect.top() + 40.0),
                 egui::Align2::LEFT_CENTER,
                 "Reconstructed",
+                egui::FontId::proportional(12.0),
+                Color32::YELLOW,
+            );
+
+            painter.text(
+                egui::Pos2::new(rect.right() - 120.0, rect.top() + 60.0),
+                egui::Align2::LEFT_CENTER,
+                "Sample Points",
                 egui::FontId::proportional(12.0),
                 Color32::YELLOW,
             );
