@@ -1,5 +1,5 @@
 use eframe::egui;
-use egui::{Color32, Stroke, vec2};
+use egui::{Color32, FontData, FontDefinitions, FontFamily, Stroke, vec2};
 use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use std::f32::consts::PI;
 
@@ -20,7 +20,58 @@ impl Default for AliasApp {
     }
 }
 
-impl AliasApp {}
+impl AliasApp {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let mut app = Self::default();
+
+        let mut fonts = FontDefinitions::default();
+
+        // fonts.font_data.insert(
+        //     "Hack".to_owned(),
+        //     std::sync::Arc::new(
+        //         // .ttf and .otf supported
+        //         FontData::from_static(crate::fonts::HACK_REGULAR),
+        //     ),
+        // );
+
+        fonts.font_data.insert(
+            "Ubuntu-Light".to_owned(),
+            std::sync::Arc::new(
+                // .ttf and .otf supported
+                FontData::from_static(crate::fonts::UBUNTU_LIGHT),
+            ),
+        );
+
+        // fonts
+        //     .families
+        //     .get_mut(&FontFamily::Proportional)
+        //     .unwrap()
+        //     .insert(0, "Hack".to_owned());
+
+        // fonts
+        //     .families
+        //     .get_mut(&FontFamily::Monospace)
+        //     .unwrap()
+        //     .push("Hack".to_owned());
+
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "Ubuntu-Light".to_owned());
+
+        fonts
+            .families
+            .get_mut(&FontFamily::Monospace)
+            .unwrap()
+            .push("Ubuntu-Light".to_owned());
+
+        let egui_ctx = &cc.egui_ctx;
+        egui_ctx.set_fonts(fonts);
+
+        app
+    }
+}
 
 impl eframe::App for AliasApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -246,29 +297,29 @@ impl AliasApp {
             let y = {
                 // Reconstruct from FFT data (Inverse Fourier transform simplified)
                 let mut y_value = 0.0;
-                
+
                 // Calculate how many frequency components to include (up to Nyquist)
                 let nyquist_idx = (self.sampling_frequency / 2.0 / freq_resolution).ceil() as usize;
                 let display_components = nyquist_idx.min(fft_output.len() / 2);
-                
+
                 // Use precise frequency reconstruction formula:
                 // y(t) = sum_k [ A_k * cos(2π*f_k*t + φ_k) ]
                 for k in 0..display_components {
                     let freq = k as f32 * freq_resolution;
-                    
+
                     // Skip DC component (k=0) as it represents constant offset
                     if k == 0 {
                         continue;
                     }
-                    
+
                     // Get amplitude and phase from complex FFT output
                     let amplitude: f32 = fft_output[k].norm();
                     let phase: f32 = fft_output[k].arg();
-                    
+
                     // Add this frequency component's contribution at time x
-                    y_value += amplitude * ( freq * x + phase).cos();
+                    y_value += amplitude * (freq * x + phase).cos();
                 }
-                
+
                 y_value
             };
 

@@ -1,2 +1,3 @@
 [toolchain]
+toolchain = "nightly"
 targets = [ "wasm32-unknown-unknown" ]

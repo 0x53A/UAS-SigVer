@@ -4,11 +4,19 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-eframe = { version = "0.31.1", features = ["default_fonts", "glow", "persistence"] }
-egui = "0.31.1"
+eframe = { version = "0.31.1", default-features = false, features = [ "glow" ] } # you can see the default features here: https://github.com/emilk/egui/blob/master/crates/eframe/Cargo.toml#L34
+egui = { version = "0.31.1", default-features = false }
 env_logger = "0.11.8"
 log = "0.4.27"
 rustfft = { version = "6.2.0", features = ["wasm_simd"] }
-serde = { version = "1.0.219", features = ["derive"] }
 wasm-bindgen-futures = "0.4.50"
 web-sys = "0.3.77"
+
+
+[profile.release]
+panic = "abort"
+lto = "fat"
+codegen-units = 1
+opt-level = "z"
+#strip = true
+

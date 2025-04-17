@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 mod app;
+mod fonts;
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
@@ -22,7 +23,7 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "UAS SigVer: Aliasing Demonstration",
         native_options,
-        Box::new(|cc| Ok(Box::new(app::AliasApp::default()))),
+        Box::new(|cc| Ok(Box::new(app::AliasApp::new(cc)))),
     )
 }
 
@@ -52,7 +53,7 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(|cc| Ok(Box::new(app::AliasApp::default()))),
+                Box::new(|cc| Ok(Box::new(app::AliasApp::new(cc)))),
             )
             .await;
 
