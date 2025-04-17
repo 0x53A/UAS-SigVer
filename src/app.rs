@@ -800,7 +800,7 @@ impl AliasApp {
                                 rect.height() / 2.0 - y2 * (rect.height() / 2.0),
                             ),
                     ],
-                    Stroke::new(2.0, Color32::RED),
+                    Stroke::new(4.0, Color32::RED),
                 );
             }
 
@@ -864,7 +864,7 @@ impl AliasApp {
                     egui::Pos2::new(rect.right() - 150.0, rect.top() + 40.0),
                     egui::Pos2::new(rect.right() - 130.0, rect.top() + 40.0),
                 ],
-                Stroke::new(2.0, Color32::RED),
+                Stroke::new(4.0, Color32::RED),
             );
 
             painter.circle_filled(
