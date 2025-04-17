@@ -226,7 +226,7 @@ impl eframe::App for AliasApp {
 
 impl AliasApp {
     fn calculate_fft(&mut self) -> (usize, Vec<Complex<f32>>) {
-        let fft_signal_size = (50.0 * self.sampling_frequency) as usize;
+        let fft_signal_size = (10.0 * self.sampling_frequency) as usize;
         // Use zero-padding at the beginning and end to reduce edge artifacts
         let n_padding = 0;
         let fft_size = fft_signal_size + 2 * n_padding;
@@ -307,17 +307,17 @@ impl AliasApp {
                 for k in 0..display_components {
                     let freq = k as f32 * freq_resolution;
 
-                    // Skip DC component (k=0) as it represents constant offset
-                    if k == 0 {
-                        continue;
-                    }
+                    // // Skip DC component (k=0) as it represents constant offset
+                    // if k == 0 {
+                    //     continue;
+                    // }
 
                     // Get amplitude and phase from complex FFT output
                     let amplitude: f32 = fft_output[k].norm();
                     let phase: f32 = fft_output[k].arg();
 
                     // Add this frequency component's contribution at time x
-                    y_value += amplitude * (freq * x + phase).cos();
+                    y_value += amplitude * (freq * x + phase).cos() / (fft_size as f32) * 2.0;
                 }
 
                 y_value
@@ -326,26 +326,26 @@ impl AliasApp {
             recon_signal.push((x, y));
         }
 
-        // scale reconstructed signal
-        let recon_min = recon_signal
-            .iter()
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .unwrap()
-            .1;
-        let recon_max = recon_signal
-            .iter()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .unwrap()
-            .1;
+        // // scale reconstructed signal
+        // let recon_min = recon_signal
+        //     .iter()
+        //     .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        //     .unwrap()
+        //     .1;
+        // let recon_max = recon_signal
+        //     .iter()
+        //     .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        //     .unwrap()
+        //     .1;
 
-        let delta = recon_max - recon_min;
-        let scale = 2.0 / delta;
+        // let delta = recon_max - recon_min;
+        // let scale = 2.0 / delta;
 
-        let half_point = recon_max - (delta / 2.0);
+        // let half_point = recon_max - (delta / 2.0);
 
-        for (x, y) in &mut recon_signal {
-            *y = (*y - half_point) * scale;
-        }
+        // for (x, y) in &mut recon_signal {
+        //     *y = (*y - half_point) * scale;
+        // }
         recon_signal
     }
 }
@@ -716,7 +716,7 @@ impl AliasApp {
                         egui::Align2::CENTER_CENTER,
                         format!("Alias: {:.1} Hz", alias_freq),
                         egui::FontId::proportional(12.0),
-                        Color32::ORANGE,
+                        Color32::RED,
                     );
                 }
             }
@@ -835,7 +835,7 @@ impl AliasApp {
                             rect.height() / 2.0 - y * (rect.height() / 2.0),
                         ),
                     4.0,
-                    Color32::ORANGE,
+                    Color32::RED,
                 );
             }
 
@@ -870,7 +870,7 @@ impl AliasApp {
             painter.circle_filled(
                 egui::Pos2::new(rect.right() - 140.0, rect.top() + 60.0),
                 4.0,
-                Color32::ORANGE,
+                Color32::RED,
             );
 
             painter.text(
