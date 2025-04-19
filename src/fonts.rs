@@ -20,4 +20,8 @@
 /// the Ubuntu brand that convey a precise, reliable and free attitude.
 ///
 /// See [Ubuntu design](https://design.ubuntu.com/font) for more information.
+#[cfg(not(target_arch = "wasm32"))]
 pub const UBUNTU_LIGHT: &[u8] = include_bytes!("../fonts/Ubuntu-Light.ttf");
+
+#[cfg(target_arch = "wasm32")]
+pub const UBUNTU_LIGHT_GZIP: &[u8] = include_bytes!("../fonts/Ubuntu-Light.ttf.gz");

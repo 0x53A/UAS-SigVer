@@ -2,6 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 mod app;
+#[cfg(target_arch = "wasm32")]
+mod font_wasm;
 mod fonts;
 
 // When compiling natively:
@@ -23,7 +25,12 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "UAS SigVer: Aliasing Demonstration",
         native_options,
-        Box::new(|cc| Ok(Box::new(app::AliasApp::new(cc)))),
+        Box::new(|cc| {
+            Ok(Box::new(app::AliasApp::new(
+                cc,
+                crate::fonts::UBUNTU_LIGHT.to_vec(),
+            )))
+        }),
     )
 }
 
@@ -49,11 +56,16 @@ fn main() {
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .expect("the_canvas_id was not a HtmlCanvasElement");
 
+        let decompressed_font = crate::font_wasm::decompress_gzip(crate::fonts::UBUNTU_LIGHT_GZIP)
+            .await
+            .expect("Failed to decompress font");
+        // let decompressed_font = vec![];
+
         let start_result = eframe::WebRunner::new()
             .start(
                 canvas,
                 web_options,
-                Box::new(|cc| Ok(Box::new(app::AliasApp::new(cc)))),
+                Box::new(|cc| Ok(Box::new(app::AliasApp::new(cc, decompressed_font)))),
             )
             .await;
 

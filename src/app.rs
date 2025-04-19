@@ -1,11 +1,13 @@
 use eframe::egui;
 use egui::{Color32, FontData, FontDefinitions, FontFamily, Stroke, vec2};
-use rustfft::{Fft, FftPlanner, num_complex::Complex};
+use rustfft::{FftPlanner, num_complex::Complex};
 use std::f32::consts::PI;
 
 pub struct AliasApp {
     signal_frequency: f32,
     sampling_frequency: f32,
+    /// the offset of the signal, between 0 and 2 (must be multiplied with π)
+    offset: f32,
 
     planner: FftPlanner<f32>,
 }
@@ -15,14 +17,15 @@ impl Default for AliasApp {
         Self {
             signal_frequency: 3.0,
             sampling_frequency: 10.0,
+            offset: 0.0,
             planner: FftPlanner::new(),
         }
     }
 }
 
 impl AliasApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let mut app = Self::default();
+    pub fn new(cc: &eframe::CreationContext<'_>, font_raw_ubuntu: Vec<u8>) -> Self {
+        let app = Self::default();
 
         let mut fonts = FontDefinitions::default();
 
@@ -38,7 +41,7 @@ impl AliasApp {
             "Ubuntu-Light".to_owned(),
             std::sync::Arc::new(
                 // .ttf and .otf supported
-                FontData::from_static(crate::fonts::UBUNTU_LIGHT),
+                FontData::from_owned(font_raw_ubuntu),
             ),
         );
 
@@ -92,7 +95,7 @@ impl eframe::App for AliasApp {
             // Constants for all plots
             let max_y = 1.0;
             let min_y = -1.0;
-            let y_range = max_y - min_y;
+            // let y_range = max_y - min_y;
 
             // Calculate total height needed for all plots
             let plot_height = ui.available_height() / 4.0 - 60.0; // 4 plots with spacing
@@ -133,9 +136,8 @@ impl eframe::App for AliasApp {
                     egui::Sense::hover(),
                 );
 
-                if let rect = response.rect {
-                    ui.painter().rect_filled(rect, 0.0, separator_color);
-                }
+                let rect = response.rect;
+                ui.painter().rect_filled(rect, 0.0, separator_color);
 
                 ui.add_space(5.0); // Space after separator
             };
@@ -164,9 +166,11 @@ impl eframe::App for AliasApp {
             draw_separator(ui);
 
             // 3. FFT of sampled points
+            let (fft_size, fft_output) = self.calculate_fft();
+            let freq_resolution = self.sampling_frequency / fft_size as f32;
             ui.colored_label(
                 Color32::YELLOW,
-                "FFT of sampled points (Frequency spectrum)",
+                format!("FFT(n={}, resolution={})", fft_size, freq_resolution),
             );
             let response3 = ui.allocate_rect(
                 egui::Rect::from_min_size(
@@ -179,10 +183,8 @@ impl eframe::App for AliasApp {
             let rect = response3.rect.intersect(ui.clip_rect());
             let painter = ui.painter();
 
-            let (fft_size, fft_output) = self.calculate_fft();
 
             // Define fixed frequency range (0 to 20 Hz)
-            let freq_resolution =
                 self.render_fft(draw_axis_labels, rect, painter, fft_size, &fft_output);
 
             ui.add_space(5.0);
@@ -224,9 +226,28 @@ impl eframe::App for AliasApp {
     }
 }
 
+
 impl AliasApp {
+
+    fn calculate_optimal_fft_size(&self) -> usize {
+        // let min = (self.sampling_frequency * 10.0) as usize;
+        // let max = (self.sampling_frequency * 15.0) as usize;
+        // (min..=max).into_iter().min_by_key(|n|{
+        //     let error_sample_rate = (*n as f32 / self.sampling_frequency) % 1.0;
+        //     let error_signal_rate = (*n as f32 / self.signal_frequency) % 1.0;
+        //     let err = error_sample_rate * error_sample_rate + error_signal_rate * error_signal_rate;
+        //     (err * 1000.0) as usize
+        // }).unwrap()
+
+        let mut n = (20.0 * self.sampling_frequency) as usize;
+        if n % 2 != 0 {
+            n += 1;
+        }
+        n
+    }
+
     fn calculate_fft(&mut self) -> (usize, Vec<Complex<f32>>) {
-        let fft_signal_size = (10.0 * self.sampling_frequency) as usize;
+        let fft_signal_size = self.calculate_optimal_fft_size();
         // Use zero-padding at the beginning and end to reduce edge artifacts
         let n_padding = 0;
         let fft_size = fft_signal_size + 2 * n_padding;
@@ -242,7 +263,7 @@ impl AliasApp {
         for i in 0..fft_signal_size {
             let t = i as f32 / self.sampling_frequency;
             // Use more precise sine calculation
-            let y = (self.signal_frequency * 2.0 * PI * t).sin();
+            let y = (self.signal_frequency * 2.0 * PI * t + self.offset * PI).sin();
             fft_input.push(y);
         }
 
@@ -252,7 +273,7 @@ impl AliasApp {
         }
 
         // Prepare FFT input
-        let mut fft_input: Vec<Complex<f32>> =
+        let fft_input: Vec<Complex<f32>> =
             fft_input.iter().map(|y| Complex::new(*y, 0.0)).collect();
 
         assert!(fft_input.len() == fft_size);
@@ -356,7 +377,7 @@ impl AliasApp {
         let signal: Vec<(f32, f32)> = (0..n_signal_points)
             .map(|i| {
                 let x = i as f32 / n_signal_points as f32 * 2.0 * PI;
-                let y = (self.signal_frequency * x).sin();
+                let y = (self.signal_frequency * x + self.offset * PI).sin();
                 (x, y)
             })
             .collect();
@@ -373,7 +394,7 @@ impl AliasApp {
                 // Time per sample = 1.0 / sampling_frequency (in seconds)
                 // Convert to our x-scale which is in [0, 2π]
                 let sample_x = i as f32 * (2.0 * PI / self.sampling_frequency);
-                let sample_y = (self.signal_frequency * sample_x).sin();
+                let sample_y = (self.signal_frequency * sample_x + self.offset * PI).sin();
                 (sample_x, sample_y)
             })
             .collect();
@@ -394,6 +415,11 @@ impl AliasApp {
         ui.horizontal(|ui| {
             ui.label("Sampling Frequency:");
             ui.add(egui::Slider::new(&mut self.sampling_frequency, 0.1..=20.0).text("Hz"));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Phase shift:");
+            ui.add(egui::Slider::new(&mut self.offset, 0.0..=2.0).text("π rad"));
         });
     }
 }
@@ -420,97 +446,96 @@ impl AliasApp {
             egui::Sense::hover(),
         );
 
-        if let rect = response1.rect.intersect(ui.clip_rect()) {
-            let painter = ui.painter();
+        let rect = response1.rect.intersect(ui.clip_rect());
+        let painter = ui.painter();
 
-            // Draw signal
-            for i in 0..signal.len() - 1 {
-                let (x1, y1) = signal[i];
-                let (x2, y2) = signal[i + 1];
-                painter.line_segment(
-                    [
-                        rect.left_top()
-                            + vec2(
-                                x1 / (2.0 * PI) * rect.width(),
-                                rect.height() / 2.0 - y1 * (rect.height() / 2.0),
-                            ),
-                        rect.left_top()
-                            + vec2(
-                                x2 / (2.0 * PI) * rect.width(),
-                                rect.height() / 2.0 - y2 * (rect.height() / 2.0),
-                            ),
-                    ],
-                    Stroke::new(2.0, Color32::GREEN),
-                );
-            }
-
-            // Draw vertical lines at sample points
-            for (x, _) in sample_points {
-                let x_pos = rect.left_top().x + *x / (2.0 * PI) * rect.width();
-                painter.line_segment(
-                    [
-                        egui::Pos2::new(x_pos, rect.top()),
-                        egui::Pos2::new(x_pos, rect.bottom()),
-                    ],
-                    Stroke::new(1.0, Color32::from_rgba_premultiplied(255, 0, 0, 100)),
-                );
-            }
-
-            // Draw sample points
-            for (x, y) in sample_points {
-                painter.circle_filled(
-                    rect.left_top()
-                        + vec2(
-                            *x / (2.0 * PI) * rect.width(),
-                            rect.height() / 2.0 - y * (rect.height() / 2.0),
-                        ),
-                    4.0,
-                    Color32::RED,
-                );
-            }
-
-            draw_axis_labels(painter, rect, "Time", "Amplitude");
-
-            // Add legend
-            painter.rect_filled(
-                egui::Rect::from_min_max(
-                    egui::Pos2::new(rect.right() - 120.0, rect.top() + 10.0),
-                    egui::Pos2::new(rect.right() - 10.0, rect.top() + 50.0),
-                ),
-                3.0,
-                Color32::from_rgba_premultiplied(40, 40, 40, 200),
-            );
-
+        // Draw signal
+        for i in 0..signal.len() - 1 {
+            let (x1, y1) = signal[i];
+            let (x2, y2) = signal[i + 1];
             painter.line_segment(
                 [
-                    egui::Pos2::new(rect.right() - 110.0, rect.top() + 20.0),
-                    egui::Pos2::new(rect.right() - 90.0, rect.top() + 20.0),
+                    rect.left_top()
+                        + vec2(
+                            x1 / (2.0 * PI) * rect.width(),
+                            rect.height() / 2.0 - y1 * (rect.height() / 2.0),
+                        ),
+                    rect.left_top()
+                        + vec2(
+                            x2 / (2.0 * PI) * rect.width(),
+                            rect.height() / 2.0 - y2 * (rect.height() / 2.0),
+                        ),
                 ],
                 Stroke::new(2.0, Color32::GREEN),
             );
+        }
 
+        // Draw vertical lines at sample points
+        for (x, _) in sample_points {
+            let x_pos = rect.left_top().x + *x / (2.0 * PI) * rect.width();
+            painter.line_segment(
+                [
+                    egui::Pos2::new(x_pos, rect.top()),
+                    egui::Pos2::new(x_pos, rect.bottom()),
+                ],
+                Stroke::new(1.0, Color32::from_rgba_premultiplied(255, 0, 0, 100)),
+            );
+        }
+
+        // Draw sample points
+        for (x, y) in sample_points {
             painter.circle_filled(
-                egui::Pos2::new(rect.right() - 100.0, rect.top() + 40.0),
+                rect.left_top()
+                    + vec2(
+                        *x / (2.0 * PI) * rect.width(),
+                        rect.height() / 2.0 - y * (rect.height() / 2.0),
+                    ),
                 4.0,
                 Color32::RED,
             );
-
-            painter.text(
-                egui::Pos2::new(rect.right() - 80.0, rect.top() + 20.0),
-                egui::Align2::LEFT_CENTER,
-                "Signal",
-                egui::FontId::proportional(12.0),
-                Color32::YELLOW,
-            );
-
-            painter.text(
-                egui::Pos2::new(rect.right() - 80.0, rect.top() + 40.0),
-                egui::Align2::LEFT_CENTER,
-                "Samples",
-                egui::FontId::proportional(12.0),
-                Color32::YELLOW,
-            );
         }
+
+        draw_axis_labels(painter, rect, "Time", "Amplitude");
+
+        // Add legend
+        painter.rect_filled(
+            egui::Rect::from_min_max(
+                egui::Pos2::new(rect.right() - 120.0, rect.top() + 10.0),
+                egui::Pos2::new(rect.right() - 10.0, rect.top() + 50.0),
+            ),
+            3.0,
+            Color32::from_rgba_premultiplied(40, 40, 40, 200),
+        );
+
+        painter.line_segment(
+            [
+                egui::Pos2::new(rect.right() - 110.0, rect.top() + 20.0),
+                egui::Pos2::new(rect.right() - 90.0, rect.top() + 20.0),
+            ],
+            Stroke::new(2.0, Color32::GREEN),
+        );
+
+        painter.circle_filled(
+            egui::Pos2::new(rect.right() - 100.0, rect.top() + 40.0),
+            4.0,
+            Color32::RED,
+        );
+
+        painter.text(
+            egui::Pos2::new(rect.right() - 80.0, rect.top() + 20.0),
+            egui::Align2::LEFT_CENTER,
+            "Signal",
+            egui::FontId::proportional(12.0),
+            Color32::YELLOW,
+        );
+
+        painter.text(
+            egui::Pos2::new(rect.right() - 80.0, rect.top() + 40.0),
+            egui::Align2::LEFT_CENTER,
+            "Samples",
+            egui::FontId::proportional(12.0),
+            Color32::YELLOW,
+        );
     }
 }
 
@@ -535,33 +560,32 @@ impl AliasApp {
             egui::Sense::hover(),
         );
 
-        if let rect = response2.rect.intersect(ui.clip_rect()) {
-            let painter = ui.painter();
+        let rect = response2.rect.intersect(ui.clip_rect());
+        let painter = ui.painter();
 
-            // Draw horizontal zero line
-            painter.line_segment(
-                [
-                    egui::Pos2::new(rect.left(), rect.top() + rect.height() / 2.0),
-                    egui::Pos2::new(rect.right(), rect.top() + rect.height() / 2.0),
-                ],
-                Stroke::new(1.0, Color32::YELLOW),
+        // Draw horizontal zero line
+        painter.line_segment(
+            [
+                egui::Pos2::new(rect.left(), rect.top() + rect.height() / 2.0),
+                egui::Pos2::new(rect.right(), rect.top() + rect.height() / 2.0),
+            ],
+            Stroke::new(1.0, Color32::YELLOW),
+        );
+
+        // Draw sample points
+        for (x, y) in &sample_points {
+            painter.circle_filled(
+                rect.left_top()
+                    + vec2(
+                        *x / (2.0 * PI) * rect.width(),
+                        rect.height() / 2.0 - y * (rect.height() / 2.0),
+                    ),
+                4.0,
+                Color32::RED,
             );
-
-            // Draw sample points
-            for (x, y) in &sample_points {
-                painter.circle_filled(
-                    rect.left_top()
-                        + vec2(
-                            *x / (2.0 * PI) * rect.width(),
-                            rect.height() / 2.0 - y * (rect.height() / 2.0),
-                        ),
-                    4.0,
-                    Color32::RED,
-                );
-            }
-
-            draw_axis_labels(painter, rect, "Time", "Amplitude");
         }
+
+        draw_axis_labels(painter, rect, "Time", "Amplitude");
     }
 }
 
@@ -573,7 +597,7 @@ impl AliasApp {
         painter: &egui::Painter,
         fft_size: usize,
         fft_output: &Vec<Complex<f32>>,
-    ) -> f32 {
+    ) {
         let max_display_freq = 20.0;
 
         // Calculate how many points to display for 0-20Hz
@@ -582,10 +606,6 @@ impl AliasApp {
         let display_points = display_points.min(fft_size / 2);
         // Don't exceed Nyquist
 
-        // Define number of buckets for display (more buckets = more resolution)
-        let num_buckets = 200;
-        // Increased from before
-
         // Calculate magnitudes
         let magnitudes: Vec<f32> = fft_output[..display_points]
             .iter()
@@ -593,7 +613,7 @@ impl AliasApp {
             .collect::<Vec<f32>>();
 
         // Find maximum for scaling
-        let max_magnitude = magnitudes.iter().fold(0.0f32, |a, &b| a.max(b));
+        // let max_magnitude = magnitudes.iter().fold(0.0f32, |a, &b| a.max(b));
 
         // Draw horizontal zero line
         painter.line_segment(
@@ -637,34 +657,25 @@ impl AliasApp {
         }
 
         // Draw FFT bars
-        if !magnitudes.is_empty() && max_magnitude > 0.0 {
-            // Calculate frequency for each bucket in our display range
-            let bucket_width = rect.width() / num_buckets as f32;
+        if !magnitudes.is_empty() {
+            // For each display bucket, position it according to its frequency
+            for i_bucket in 0..magnitudes.len() {
+                // Calculate the frequency this bucket represents
+                let bucket_freq = i_bucket as f32 * freq_resolution;
 
-            // For each display bucket, find the max magnitude in the corresponding frequency range
-            for bucket in 0..num_buckets {
-                let bucket_start_freq = bucket as f32 * max_display_freq / num_buckets as f32;
-                let bucket_end_freq = (bucket + 1) as f32 * max_display_freq / num_buckets as f32;
+                // Position the bucket according to its frequency (scaled to display width)
+                let x = rect.left() + (bucket_freq / max_display_freq) * rect.width();
 
-                let bucket_start_idx = (bucket_start_freq / freq_resolution).floor() as usize;
-                let bucket_end_idx = (bucket_end_freq / freq_resolution).ceil() as usize;
+                // Calculate width based on frequency resolution
+                let next_freq = (i_bucket + 1) as f32 * freq_resolution;
+                let next_x = rect.left() + (next_freq / max_display_freq) * rect.width();
+                let bucket_width = next_x - x;
 
-                let bucket_end_idx = bucket_end_idx.min(display_points);
-
-                // Find max magnitude in this frequency bucket
-                let mut max_bucket_magnitude: f32 = 0.0;
-                if bucket_start_idx < bucket_end_idx && bucket_start_idx < magnitudes.len() {
-                    for i in bucket_start_idx..bucket_end_idx.min(magnitudes.len()) {
-                        max_bucket_magnitude = max_bucket_magnitude.max(magnitudes[i]);
-                    }
-                }
-
-                let normalized_height = max_bucket_magnitude / max_magnitude * rect.height();
-                let x = rect.left() + bucket as f32 * bucket_width;
+                let y = magnitudes[i_bucket] * 2.0 * rect.height();
 
                 painter.rect_filled(
                     egui::Rect::from_min_max(
-                        egui::Pos2::new(x, rect.bottom() - normalized_height),
+                        egui::Pos2::new(x, rect.bottom() - y),
                         egui::Pos2::new(x + bucket_width * 0.9, rect.bottom()),
                     ),
                     0.0,
@@ -744,7 +755,6 @@ impl AliasApp {
                 Color32::YELLOW,
             );
         }
-        freq_resolution
     }
 }
 
@@ -770,133 +780,132 @@ impl AliasApp {
             egui::Sense::hover(),
         );
 
-        if let rect = response4.rect.intersect(ui.clip_rect()) {
-            let painter = ui.painter();
+        let rect = response4.rect.intersect(ui.clip_rect());
+        let painter = ui.painter();
 
-            // Draw horizontal zero line
+        // Draw horizontal zero line
+        painter.line_segment(
+            [
+                egui::Pos2::new(rect.left(), rect.top() + rect.height() / 2.0),
+                egui::Pos2::new(rect.right(), rect.top() + rect.height() / 2.0),
+            ],
+            Stroke::new(1.0, Color32::YELLOW),
+        );
+
+        // Draw reconstructed signal
+        for i in 0..recon_signal.len() - 1 {
+            let (x1, y1) = recon_signal[i];
+            let (x2, y2) = recon_signal[i + 1];
+
             painter.line_segment(
                 [
-                    egui::Pos2::new(rect.left(), rect.top() + rect.height() / 2.0),
-                    egui::Pos2::new(rect.right(), rect.top() + rect.height() / 2.0),
-                ],
-                Stroke::new(1.0, Color32::YELLOW),
-            );
-
-            // Draw reconstructed signal
-            for i in 0..recon_signal.len() - 1 {
-                let (x1, y1) = recon_signal[i];
-                let (x2, y2) = recon_signal[i + 1];
-
-                painter.line_segment(
-                    [
-                        rect.left_top()
-                            + vec2(
-                                x1 / (2.0 * PI) * rect.width(),
-                                rect.height() / 2.0 - y1 * (rect.height() / 2.0),
-                            ),
-                        rect.left_top()
-                            + vec2(
-                                x2 / (2.0 * PI) * rect.width(),
-                                rect.height() / 2.0 - y2 * (rect.height() / 2.0),
-                            ),
-                    ],
-                    Stroke::new(4.0, Color32::RED),
-                );
-            }
-
-            // Draw original signal for comparison (thinner line)
-            for i in 0..signal.len() - 1 {
-                let (x1, y1) = signal[i];
-                let (x2, y2) = signal[i + 1];
-                painter.line_segment(
-                    [
-                        rect.left_top()
-                            + vec2(
-                                x1 / (2.0 * PI) * rect.width(),
-                                rect.height() / 2.0 - y1 * (rect.height() / 2.0),
-                            ),
-                        rect.left_top()
-                            + vec2(
-                                x2 / (2.0 * PI) * rect.width(),
-                                rect.height() / 2.0 - y2 * (rect.height() / 2.0),
-                            ),
-                    ],
-                    Stroke::new(1.0, Color32::GREEN),
-                );
-            }
-
-            // Draw sample points
-            let sample_points = self.calculate_sample_points();
-            for (x, y) in &sample_points {
-                painter.circle_filled(
                     rect.left_top()
                         + vec2(
-                            *x / (2.0 * PI) * rect.width(),
-                            rect.height() / 2.0 - y * (rect.height() / 2.0),
+                            x1 / (2.0 * PI) * rect.width(),
+                            rect.height() / 2.0 - y1 * (rect.height() / 2.0),
                         ),
-                    4.0,
-                    Color32::RED,
-                );
-            }
-
-            draw_axis_labels(painter, rect, "Time", "Amplitude");
-
-            // Add legend
-            painter.rect_filled(
-                egui::Rect::from_min_max(
-                    egui::Pos2::new(rect.right() - 160.0, rect.top() + 10.0),
-                    egui::Pos2::new(rect.right() - 10.0, rect.top() + 70.0),
-                ),
-                3.0,
-                Color32::from_rgba_premultiplied(40, 40, 40, 200),
-            );
-
-            painter.line_segment(
-                [
-                    egui::Pos2::new(rect.right() - 150.0, rect.top() + 20.0),
-                    egui::Pos2::new(rect.right() - 130.0, rect.top() + 20.0),
-                ],
-                Stroke::new(1.0, Color32::GREEN),
-            );
-
-            painter.line_segment(
-                [
-                    egui::Pos2::new(rect.right() - 150.0, rect.top() + 40.0),
-                    egui::Pos2::new(rect.right() - 130.0, rect.top() + 40.0),
+                    rect.left_top()
+                        + vec2(
+                            x2 / (2.0 * PI) * rect.width(),
+                            rect.height() / 2.0 - y2 * (rect.height() / 2.0),
+                        ),
                 ],
                 Stroke::new(4.0, Color32::RED),
             );
+        }
 
-            painter.circle_filled(
-                egui::Pos2::new(rect.right() - 140.0, rect.top() + 60.0),
-                4.0,
-                Color32::RED,
-            );
-
-            painter.text(
-                egui::Pos2::new(rect.right() - 120.0, rect.top() + 20.0),
-                egui::Align2::LEFT_CENTER,
-                "Original Signal",
-                egui::FontId::proportional(12.0),
-                Color32::YELLOW,
-            );
-
-            painter.text(
-                egui::Pos2::new(rect.right() - 120.0, rect.top() + 40.0),
-                egui::Align2::LEFT_CENTER,
-                "Reconstructed",
-                egui::FontId::proportional(12.0),
-                Color32::YELLOW,
-            );
-
-            painter.text(
-                egui::Pos2::new(rect.right() - 120.0, rect.top() + 60.0),
-                egui::Align2::LEFT_CENTER,
-                "Sample Points",
-                egui::FontId::proportional(12.0),
-                Color32::YELLOW,
+        // Draw original signal for comparison (thinner line)
+        for i in 0..signal.len() - 1 {
+            let (x1, y1) = signal[i];
+            let (x2, y2) = signal[i + 1];
+            painter.line_segment(
+                [
+                    rect.left_top()
+                        + vec2(
+                            x1 / (2.0 * PI) * rect.width(),
+                            rect.height() / 2.0 - y1 * (rect.height() / 2.0),
+                        ),
+                    rect.left_top()
+                        + vec2(
+                            x2 / (2.0 * PI) * rect.width(),
+                            rect.height() / 2.0 - y2 * (rect.height() / 2.0),
+                        ),
+                ],
+                Stroke::new(1.0, Color32::GREEN),
             );
         }
+
+        // Draw sample points
+        let sample_points = self.calculate_sample_points();
+        for (x, y) in &sample_points {
+            painter.circle_filled(
+                rect.left_top()
+                    + vec2(
+                        *x / (2.0 * PI) * rect.width(),
+                        rect.height() / 2.0 - y * (rect.height() / 2.0),
+                    ),
+                4.0,
+                Color32::GREEN,
+            );
+        }
+
+        draw_axis_labels(painter, rect, "Time", "Amplitude");
+
+        // Add legend
+        painter.rect_filled(
+            egui::Rect::from_min_max(
+                egui::Pos2::new(rect.right() - 160.0, rect.top() + 10.0),
+                egui::Pos2::new(rect.right() - 10.0, rect.top() + 70.0),
+            ),
+            3.0,
+            Color32::from_rgba_premultiplied(40, 40, 40, 200),
+        );
+
+        painter.line_segment(
+            [
+                egui::Pos2::new(rect.right() - 150.0, rect.top() + 20.0),
+                egui::Pos2::new(rect.right() - 130.0, rect.top() + 20.0),
+            ],
+            Stroke::new(1.0, Color32::GREEN),
+        );
+
+        painter.line_segment(
+            [
+                egui::Pos2::new(rect.right() - 150.0, rect.top() + 40.0),
+                egui::Pos2::new(rect.right() - 130.0, rect.top() + 40.0),
+            ],
+            Stroke::new(4.0, Color32::RED),
+        );
+
+        painter.circle_filled(
+            egui::Pos2::new(rect.right() - 140.0, rect.top() + 60.0),
+            4.0,
+            Color32::GREEN,
+        );
+
+        painter.text(
+            egui::Pos2::new(rect.right() - 120.0, rect.top() + 20.0),
+            egui::Align2::LEFT_CENTER,
+            "Original Signal",
+            egui::FontId::proportional(12.0),
+            Color32::YELLOW,
+        );
+
+        painter.text(
+            egui::Pos2::new(rect.right() - 120.0, rect.top() + 40.0),
+            egui::Align2::LEFT_CENTER,
+            "Reconstructed",
+            egui::FontId::proportional(12.0),
+            Color32::YELLOW,
+        );
+
+        painter.text(
+            egui::Pos2::new(rect.right() - 120.0, rect.top() + 60.0),
+            egui::Align2::LEFT_CENTER,
+            "Sample Points",
+            egui::FontId::proportional(12.0),
+            Color32::YELLOW,
+        );
     }
 }
 
@@ -922,34 +931,33 @@ impl AliasApp {
                     egui::Sense::hover(),
                 );
 
-                if let rect = warning_rect.rect {
-                    ui.painter().rect_filled(
-                        rect,
-                        5.0,
-                        Color32::from_rgba_premultiplied(100, 0, 0, 200),
-                    );
+                let rect = warning_rect.rect;
+                ui.painter().rect_filled(
+                    rect,
+                    5.0,
+                    Color32::from_rgba_premultiplied(100, 0, 0, 200),
+                );
 
-                    ui.painter().text(
-                        egui::Pos2::new(rect.left() + 20.0, rect.top() + 20.0),
-                        egui::Align2::LEFT_CENTER,
-                        "Aliasing detected! Signal frequency exceeds Nyquist limit.",
-                        egui::FontId::proportional(16.0),
-                        Color32::RED,
-                    );
+                ui.painter().text(
+                    egui::Pos2::new(rect.left() + 20.0, rect.top() + 20.0),
+                    egui::Align2::LEFT_CENTER,
+                    "Aliasing detected! Signal frequency exceeds Nyquist limit.",
+                    egui::FontId::proportional(16.0),
+                    Color32::RED,
+                );
 
-                    ui.painter().text(
-                        egui::Pos2::new(rect.left() + 20.0, rect.top() + 40.0),
-                        egui::Align2::LEFT_CENTER,
-                        format!(
-                            "Signal: {:.1} Hz appears as: {:.1} Hz (Nyquist: {:.1} Hz)",
-                            self.signal_frequency,
-                            alias_freq,
-                            self.sampling_frequency / 2.0
-                        ),
-                        egui::FontId::proportional(14.0),
-                        Color32::LIGHT_RED,
-                    );
-                }
+                ui.painter().text(
+                    egui::Pos2::new(rect.left() + 20.0, rect.top() + 40.0),
+                    egui::Align2::LEFT_CENTER,
+                    format!(
+                        "Signal: {:.1} Hz appears as: {:.1} Hz (Nyquist: {:.1} Hz)",
+                        self.signal_frequency,
+                        alias_freq,
+                        self.sampling_frequency / 2.0
+                    ),
+                    egui::FontId::proportional(14.0),
+                    Color32::LIGHT_RED,
+                );
             });
         });
     }

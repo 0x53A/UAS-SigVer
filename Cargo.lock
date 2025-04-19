@@ -9,8 +9,10 @@ dependencies = [
  "eframe",
  "egui",
  "env_logger",
+ "js-sys",
  "log",
  "rustfft",
+ "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
 ]
