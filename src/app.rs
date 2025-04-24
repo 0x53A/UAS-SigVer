@@ -1,5 +1,6 @@
 use eframe::egui;
 use egui::{Color32, FontData, FontDefinitions, FontFamily, Stroke, vec2};
+use ordered_float::NotNan;
 use rustfft::{FftPlanner, num_complex::Complex};
 use std::f32::consts::PI;
 
@@ -183,9 +184,8 @@ impl eframe::App for AliasApp {
             let rect = response3.rect.intersect(ui.clip_rect());
             let painter = ui.painter();
 
-
             // Define fixed frequency range (0 to 20 Hz)
-                self.render_fft(draw_axis_labels, rect, painter, fft_size, &fft_output);
+            self.render_fft(draw_axis_labels, rect, painter, fft_size, &fft_output);
 
             ui.add_space(5.0);
             draw_separator(ui);
@@ -226,9 +226,7 @@ impl eframe::App for AliasApp {
     }
 }
 
-
 impl AliasApp {
-
     fn calculate_optimal_fft_size(&self) -> usize {
         // let min = (self.sampling_frequency * 10.0) as usize;
         // let max = (self.sampling_frequency * 15.0) as usize;
@@ -409,17 +407,44 @@ impl AliasApp {
 
         ui.horizontal(|ui| {
             ui.label("Signal Frequency:");
-            ui.add(egui::Slider::new(&mut self.signal_frequency, 0.1..=10.0).text("Hz"));
+            let slider_width = NotNan::max(
+                100u16.into(),
+                NotNan::new(ui.available_width() - 50.0).unwrap(),
+            );
+            ui.spacing_mut().slider_width = slider_width.into();
+            ui.add(
+                egui::Slider::new(&mut self.signal_frequency, 0.1..=10.0)
+                    .text("Hz")
+                    .fixed_decimals(2),
+            );
         });
 
         ui.horizontal(|ui| {
             ui.label("Sampling Frequency:");
-            ui.add(egui::Slider::new(&mut self.sampling_frequency, 0.1..=20.0).text("Hz"));
+            let slider_width = NotNan::max(
+                100u16.into(),
+                NotNan::new(ui.available_width() - 50.0).unwrap(),
+            );
+            ui.spacing_mut().slider_width = slider_width.into();
+            ui.add(
+                egui::Slider::new(&mut self.sampling_frequency, 0.1..=20.0)
+                    .text("Hz")
+                    .fixed_decimals(2),
+            );
         });
 
         ui.horizontal(|ui| {
             ui.label("Phase shift:");
-            ui.add(egui::Slider::new(&mut self.offset, 0.0..=2.0).text("π rad"));
+            let slider_width = NotNan::max(
+                100u16.into(),
+                NotNan::new(ui.available_width() - 50.0).unwrap(),
+            );
+            ui.spacing_mut().slider_width = slider_width.into();
+            ui.add(
+                egui::Slider::new(&mut self.offset, 0.0..=2.0)
+                    .text("π rad")
+                    .fixed_decimals(2),
+            );
         });
     }
 }
