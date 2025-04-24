@@ -1,6 +1,6 @@
 {
-  "name": "egui Template PWA",
-  "short_name": "egui-template-pwa",
+  "name": "UAS SigVer",
+  "short_name": "uas-sigver-pwa",
   "icons": [
     {
       "src": "./assets/icon-256.png",
