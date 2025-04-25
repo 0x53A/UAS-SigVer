@@ -94,8 +94,8 @@ impl eframe::App for AliasApp {
             let sample_points = self.calculate_sample_points();
 
             // Constants for all plots
-            let max_y = 1.0;
-            let min_y = -1.0;
+            let _max_y = 1.0;
+            let _min_y = -1.0;
             // let y_range = max_y - min_y;
 
             // Calculate total height needed for all plots
