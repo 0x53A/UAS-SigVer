@@ -1,16 +1,35 @@
 [package]
-name = "UAS-SigVer"
+name = "uas-sigver"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "uas-sigver"
+#path = "gen/bin/desktop.rs"
+
+[lib]
+name = "uas_sigver_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+
+[package.metadata.cargo-android]
+app-dependencies = [
+    "com.google.android.material:material:1.8.0",
+]
+project-dependencies = [ "org.jetbrains.kotlin:kotlin-gradle-plugin:1.6.21" ]
+app-plugins = [ "org.jetbrains.kotlin.android" ]
+app-theme-parent = "Theme.MaterialComponents.DayNight.DarkActionBar"
+
 [dependencies]
-eframe = { version = "0.31.1", default-features = false, features = [ "glow" ] } # you can see the default features here: https://github.com/emilk/egui/blob/master/crates/eframe/Cargo.toml#L34
-egui = { version = "0.31.1", default-features = false }
 env_logger = "0.11.8"
-js-sys = "0.3.77"
 log = "0.4.27"
 ordered-float = "5.0.0"
 rustfft = { version = "6.2.0", features = ["wasm_simd"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+eframe = { version = "0.31", default-features = false, features = [ "glow" ] } # you can see the default features here: https://github.com/emilk/egui/blob/master/crates/eframe/Cargo.toml#L34
+egui = { version = "0.31", default-features = false }
+js-sys = "0.3.77"
 wasm-bindgen = "0.2.100"
 wasm-bindgen-futures = "0.4.50"
 web-sys = { version = "0.3.77", features = [
@@ -27,14 +46,29 @@ web-sys = { version = "0.3.77", features = [
     "Blob"
   ] }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+eframe = { version = "0.31.1", default-features = false, features = [ "glow" ] } # you can see the default features here: https://github.com/emilk/egui/blob/master/crates/eframe/Cargo.toml#L34
+egui = { version = "0.31.1", default-features = false }
+
+[target.'cfg(target_os = "android")'.dependencies]
+egui = { version = "0.31" } # default features, including embedded fonts
+egui-winit = { version = "0.31", default-features = false }
+egui-wgpu = { version = "0.31", features = [ "winit" ] }
+winit = { version = "0.30", features = ["android-native-activity"] }
+wgpu = "25.0"
+pollster = "0.4"
+android_logger = "0.15"
+
 
 [profile.release]
-panic = "abort"
 lto = "fat"
 codegen-units = 1
 opt-level = "z"
 #strip = true
 
+# doesn't work: https://github.com/rust-lang/cargo/issues/4897
+#[profile.release.target.wasm32-unknown-unknown]
+#panic = "abort"
 
 [profile.dev]
 #opt-level = "s"

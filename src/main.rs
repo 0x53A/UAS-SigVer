@@ -6,7 +6,21 @@ mod app;
 mod font_wasm;
 mod fonts;
 
+use egui::{FontData, FontDefinitions, FontFamily};
+
+#[cfg(not(target_os = "android"))]
+impl eframe::App for app::AliasApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.ui(ctx);
+    }
+}
+
+// for some reason we need an empty main for android, the actual entry point is in lib.rs
+#[cfg(target_os = "android")]
+fn main() {}
+
 // When compiling natively:
+#[cfg(not(target_os = "android"))]
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -26,10 +40,8 @@ fn main() -> eframe::Result {
         "UAS SigVer: Aliasing Demonstration",
         native_options,
         Box::new(|cc| {
-            Ok(Box::new(app::AliasApp::new(
-                cc,
-                crate::fonts::UBUNTU_LIGHT.to_vec(),
-            )))
+            add_font_to_ctx(cc, crate::fonts::UBUNTU_LIGHT.to_vec());
+            Ok(Box::new(app::AliasApp::default()))
         }),
     )
 }
@@ -65,7 +77,10 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(|cc| Ok(Box::new(app::AliasApp::new(cc, decompressed_font)))),
+                Box::new(|cc| {
+                    add_font_to_ctx(cc, decompressed_font);
+                    Ok(Box::new(app::AliasApp::default()))
+                }),
             )
             .await;
 
@@ -84,4 +99,52 @@ fn main() {
             }
         }
     });
+}
+
+#[cfg(not(target_os = "android"))]
+pub fn add_font_to_ctx(cc: &eframe::CreationContext<'_>, font_raw_ubuntu: Vec<u8>) {
+    let mut fonts = FontDefinitions::default();
+
+    // fonts.font_data.insert(
+    //     "Hack".to_owned(),
+    //     std::sync::Arc::new(
+    //         // .ttf and .otf supported
+    //         FontData::from_static(crate::fonts::HACK_REGULAR),
+    //     ),
+    // );
+
+    fonts.font_data.insert(
+        "Ubuntu-Light".to_owned(),
+        std::sync::Arc::new(
+            // .ttf and .otf supported
+            FontData::from_owned(font_raw_ubuntu),
+        ),
+    );
+
+    // fonts
+    //     .families
+    //     .get_mut(&FontFamily::Proportional)
+    //     .unwrap()
+    //     .insert(0, "Hack".to_owned());
+
+    // fonts
+    //     .families
+    //     .get_mut(&FontFamily::Monospace)
+    //     .unwrap()
+    //     .push("Hack".to_owned());
+
+    fonts
+        .families
+        .get_mut(&FontFamily::Proportional)
+        .unwrap()
+        .insert(0, "Ubuntu-Light".to_owned());
+
+    fonts
+        .families
+        .get_mut(&FontFamily::Monospace)
+        .unwrap()
+        .push("Ubuntu-Light".to_owned());
+
+    let egui_ctx = &cc.egui_ctx;
+    egui_ctx.set_fonts(fonts);
 }

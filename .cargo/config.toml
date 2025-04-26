@@ -1,15 +1,64 @@
-[build]
+[target.aarch64-linux-android]
+linker = 'C:\Users\Lukas\AppData\Local\Android\Sdk\ndk\29.0.13113456\toolchains/llvm/prebuilt/windows-x86_64\bin\aarch64-linux-android24-clang.cmd'
+rustflags = [
+    "-Clink-arg=-landroid",
+    "-Clink-arg=-llog",
+    "-Clink-arg=-lOpenSLES",
+]
+
+[target.armv7-linux-androideabi]
+linker = 'C:\Users\Lukas\AppData\Local\Android\Sdk\ndk\29.0.13113456\toolchains/llvm/prebuilt/windows-x86_64\bin\armv7a-linux-androideabi24-clang.cmd'
+rustflags = [
+    "-Clink-arg=-landroid",
+    "-Clink-arg=-llog",
+    "-Clink-arg=-lOpenSLES",
+]
+
+[target.i686-linux-android]
+linker = 'C:\Users\Lukas\AppData\Local\Android\Sdk\ndk\29.0.13113456\toolchains/llvm/prebuilt/windows-x86_64\bin\i686-linux-android24-clang.cmd'
+rustflags = [
+    "-Clink-arg=-landroid",
+    "-Clink-arg=-llog",
+    "-Clink-arg=-lOpenSLES",
+]
+
+
+
+[target.x86_64-linux-android]
+linker = 'C:\Users\Lukas\AppData\Local\Android\Sdk\ndk\29.0.13113456\toolchains/llvm/prebuilt/windows-x86_64\bin\x86_64-linux-android24-clang.cmd'
+rustflags = [
+    "-Clink-arg=-landroid",
+    "-Clink-arg=-llog",
+    "-Clink-arg=-lOpenSLES",
+]
+
+
+# ----------------------------------------------------------------------------------------------
+
+
+# Configuration specific to the wasm32-unknown-unknown target
+[target.wasm32-unknown-unknown]
 rustflags = [
     # required for DecompressionStream
     # https://docs.rs/web-sys/latest/web_sys/struct.DecompressionStream.html
     "--cfg=web_sys_unstable_apis",
+
     # size
     "-Zlocation-detail=none",
     "-Zfmt-debug=none",
-   # "-Ctarget-cpu=mvp"
-]
-target = "wasm32-unknown-unknown"
 
-[unstable]
-build-std = ["std", "panic_abort"]
-build-std-features = ["optimize_for_size", "panic_immediate_abort"]
+    # may be required to target older wasm engines
+    # "-Ctarget-cpu=mvp",
+
+    "-Cpanic=abort",
+]
+
+# doesn't work: https://github.com/rust-lang/cargo/issues/8733
+#[target.wasm32-unknown-unknown.unstable]
+#build-std = "std panic_abort"
+#build-std-features = "optimize_for_size panic_immediate_abort"
+
+
+#[unstable]
+#build-std = ["std", "panic_abort"]
+#build-std-features = ["optimize_for_size", "panic_immediate_abort"]

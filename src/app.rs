@@ -1,6 +1,4 @@
-use eframe::egui;
-use egui::{Color32, FontData, FontDefinitions, FontFamily, Stroke, vec2};
-use ordered_float::NotNan;
+use egui::{self, Color32, Stroke, vec2};
 use rustfft::{FftPlanner, num_complex::Complex};
 use std::f32::consts::PI;
 
@@ -25,60 +23,7 @@ impl Default for AliasApp {
 }
 
 impl AliasApp {
-    pub fn new(cc: &eframe::CreationContext<'_>, font_raw_ubuntu: Vec<u8>) -> Self {
-        let app = Self::default();
-
-        let mut fonts = FontDefinitions::default();
-
-        // fonts.font_data.insert(
-        //     "Hack".to_owned(),
-        //     std::sync::Arc::new(
-        //         // .ttf and .otf supported
-        //         FontData::from_static(crate::fonts::HACK_REGULAR),
-        //     ),
-        // );
-
-        fonts.font_data.insert(
-            "Ubuntu-Light".to_owned(),
-            std::sync::Arc::new(
-                // .ttf and .otf supported
-                FontData::from_owned(font_raw_ubuntu),
-            ),
-        );
-
-        // fonts
-        //     .families
-        //     .get_mut(&FontFamily::Proportional)
-        //     .unwrap()
-        //     .insert(0, "Hack".to_owned());
-
-        // fonts
-        //     .families
-        //     .get_mut(&FontFamily::Monospace)
-        //     .unwrap()
-        //     .push("Hack".to_owned());
-
-        fonts
-            .families
-            .get_mut(&FontFamily::Proportional)
-            .unwrap()
-            .insert(0, "Ubuntu-Light".to_owned());
-
-        fonts
-            .families
-            .get_mut(&FontFamily::Monospace)
-            .unwrap()
-            .push("Ubuntu-Light".to_owned());
-
-        let egui_ctx = &cc.egui_ctx;
-        egui_ctx.set_fonts(fonts);
-
-        app
-    }
-}
-
-impl eframe::App for AliasApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    pub fn ui(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             // Set dark mode
             ui.ctx().set_visuals(egui::Visuals::dark());
@@ -171,7 +116,7 @@ impl eframe::App for AliasApp {
             let freq_resolution = self.sampling_frequency / fft_size as f32;
             ui.colored_label(
                 Color32::YELLOW,
-                format!("FFT(n={}, resolution={})", fft_size, freq_resolution),
+                format!("FFT(n={fft_size}, resolution={freq_resolution})"),
             );
             let response3 = ui.allocate_rect(
                 egui::Rect::from_min_size(
@@ -407,11 +352,7 @@ impl AliasApp {
 
         ui.horizontal(|ui| {
             ui.label("Signal Frequency:");
-            let slider_width = NotNan::max(
-                100u16.into(),
-                NotNan::new(ui.available_width() - 50.0).unwrap(),
-            );
-            ui.spacing_mut().slider_width = slider_width.into();
+            ui.spacing_mut().slider_width = ui.available_width() - 100.0;
             ui.add(
                 egui::Slider::new(&mut self.signal_frequency, 0.1..=10.0)
                     .text("Hz")
@@ -421,11 +362,7 @@ impl AliasApp {
 
         ui.horizontal(|ui| {
             ui.label("Sampling Frequency:");
-            let slider_width = NotNan::max(
-                100u16.into(),
-                NotNan::new(ui.available_width() - 50.0).unwrap(),
-            );
-            ui.spacing_mut().slider_width = slider_width.into();
+            ui.spacing_mut().slider_width = ui.available_width() - 100.0;
             ui.add(
                 egui::Slider::new(&mut self.sampling_frequency, 0.1..=20.0)
                     .text("Hz")
@@ -435,15 +372,12 @@ impl AliasApp {
 
         ui.horizontal(|ui| {
             ui.label("Phase shift:");
-            let slider_width = NotNan::max(
-                100u16.into(),
-                NotNan::new(ui.available_width() - 50.0).unwrap(),
-            );
-            ui.spacing_mut().slider_width = slider_width.into();
+            ui.spacing_mut().slider_width = ui.available_width() - 100.0;
             ui.add(
                 egui::Slider::new(&mut self.offset, 0.0..=2.0)
                     .text("π rad")
-                    .fixed_decimals(2),
+                    .fixed_decimals(2)
+                    .step_by(0.01),
             );
         });
     }
@@ -675,7 +609,7 @@ impl AliasApp {
             painter.text(
                 egui::Pos2::new(x_pos, rect.bottom() + 15.0),
                 egui::Align2::CENTER_CENTER,
-                format!("{} Hz", freq),
+                format!("{freq} Hz"),
                 egui::FontId::proportional(12.0),
                 Color32::YELLOW,
             );
@@ -750,7 +684,7 @@ impl AliasApp {
                     painter.text(
                         egui::Pos2::new(rect.left() + alias_pos + 50.0, rect.top() + 30.0),
                         egui::Align2::CENTER_CENTER,
-                        format!("Alias: {:.1} Hz", alias_freq),
+                        format!("Alias: {alias_freq:.1} Hz"),
                         egui::FontId::proportional(12.0),
                         Color32::RED,
                     );
@@ -775,7 +709,7 @@ impl AliasApp {
             painter.text(
                 egui::Pos2::new(rect.left() + nyquist_pos, rect.bottom() - 5.0),
                 egui::Align2::CENTER_BOTTOM,
-                format!("Nyquist: {:.1} Hz", nyquist_freq),
+                format!("Nyquist: {nyquist_freq:.1} Hz"),
                 egui::FontId::proportional(12.0),
                 Color32::YELLOW,
             );

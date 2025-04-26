@@ -1,0 +1,5 @@
+[app]
+name = "uas-sigver"
+stylized-name = "UAS SigVer"
+identifier = "com.x53a.uas_sigver"
+template-pack = "egui"
