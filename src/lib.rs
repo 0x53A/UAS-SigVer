@@ -1,15 +1,17 @@
-#![cfg(target_os = "android")]
+#![cfg(any(target_os = "android", target_os = "ios"))]
 
 mod app;
 
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
+#[cfg(target_os = "ios")]
+use winit::platform::ios::EventLoopBuilderExtIOS;
 
 use std::num::NonZeroU32;
 use std::sync::Arc;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder};
 use winit::window::{Window, WindowAttributes, WindowId};
 
 use egui::ViewportId;
@@ -225,7 +227,11 @@ fn stop_unwind<F: FnOnce() -> T, T>(f: F) -> T {
 
 #[cfg(target_os = "ios")]
 fn _start_app() {
-    stop_unwind(|| main());
+    let event_loop = EventLoopBuilder::<UserEvent>::with_user_event()
+        .with_main_thread_check(true) // Ensure this runs on the main thread for iOS
+        .build()
+        .unwrap();
+    stop_unwind(|| _main(event_loop));
 }
 
 #[unsafe(no_mangle)]
@@ -235,14 +241,14 @@ pub extern "C" fn start_app() {
     _start_app();
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub fn main() {
     env_logger::builder()
         .filter_level(log::LevelFilter::Warn)
         .parse_default_env()
         .init();
 
-    let event_loop = EventLoop::<UserEvent>::with_user_event().build().unwrap();
+    let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build().unwrap();
     _main(event_loop);
 }
 

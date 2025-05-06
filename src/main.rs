@@ -8,7 +8,7 @@ mod fonts;
 
 use egui::{FontData, FontDefinitions, FontFamily};
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 impl eframe::App for app::AliasApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.ui(ctx);
@@ -20,8 +20,7 @@ impl eframe::App for app::AliasApp {
 fn main() {}
 
 // When compiling natively:
-#[cfg(not(target_os = "android"))]
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_os = "android", target_os = "ios", target_arch = "wasm32")))]
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
@@ -101,7 +100,7 @@ fn main() {
     });
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub fn add_font_to_ctx(cc: &eframe::CreationContext<'_>, font_raw_ubuntu: Vec<u8>) {
     let mut fonts = FontDefinitions::default();
 
