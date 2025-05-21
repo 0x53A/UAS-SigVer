@@ -18,7 +18,23 @@ jobs:
   build-github-pages:
     runs-on: ubuntu-latest
     steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BERKELEY_MONO_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
       - uses: actions/checkout@v4 # repo checkout
+        with:
+          submodules: false
+          
+      - name: Update Git submodule URLs to SSH
+        run: git config --global url."git@github.com:".insteadOf "https://github.com/"
+        
+      - name: Fetch submodules
+        run: git submodule update --init --recursive
+
       - name: Setup toolchain for wasm
         run: |
           rustup update nightly
@@ -26,10 +42,13 @@ jobs:
           rustup set profile minimal
           rustup target add wasm32-unknown-unknown
           rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+
       - name: Rust Cache # cache the rust build artefacts
         uses: Swatinem/rust-cache@v2
+
       - name: Download and install Trunk binary
         run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+
       - name: Build # build
         # Environment $public_url resolves to the github project page.
         # If using a user/organization page, remove the `${{ github.event.repository.name }}` part.
@@ -37,9 +56,10 @@ jobs:
         # this is necessary for github pages where the site is deployed to username.github.io/repo_name and all files must be requested
         # relatively as eframe_template/favicon.ico. if we skip public-url option, the href paths will instead request username.github.io/favicon.ico which
         # will obviously return error 404 not found.
-        run: ./trunk build --release --public-url $public_url
+        run: ./trunk build --release --no-default-features --features font_berkeley_mono,font_hack --public-url $public_url
         env:
           public_url: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:

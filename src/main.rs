@@ -39,7 +39,7 @@ fn main() -> eframe::Result {
         "UAS SigVer: Aliasing Demonstration",
         native_options,
         Box::new(|cc| {
-            add_font_to_ctx(cc, crate::fonts::UBUNTU_LIGHT.to_vec());
+            add_fonts_to_ctx(&cc.egui_ctx);
             Ok(Box::new(app::AliasApp::default()))
         }),
     )
@@ -67,17 +67,21 @@ fn main() {
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .expect("the_canvas_id was not a HtmlCanvasElement");
 
-        let decompressed_font = crate::font_wasm::decompress_gzip(crate::fonts::UBUNTU_LIGHT_GZIP)
-            .await
-            .expect("Failed to decompress font");
-        // let decompressed_font = vec![];
+        #[cfg(feature = "font_ubuntu_light_compressed")]
+        {
+            let decompressed_font =
+                crate::font_wasm::decompress_gzip(crate::fonts::UBUNTU_LIGHT_GZIP)
+                    .await
+                    .expect("Failed to decompress font");
+            crate::fonts::UBUNTU_LIGHT.copy_from_slice(&decompressed_font);
+        }
 
         let start_result = eframe::WebRunner::new()
             .start(
                 canvas,
                 web_options,
                 Box::new(|cc| {
-                    add_font_to_ctx(cc, decompressed_font);
+                    add_fonts_to_ctx(&cc.egui_ctx);
                     Ok(Box::new(app::AliasApp::default()))
                 }),
             )
@@ -101,49 +105,86 @@ fn main() {
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-pub fn add_font_to_ctx(cc: &eframe::CreationContext<'_>, font_raw_ubuntu: Vec<u8>) {
-    let mut fonts = FontDefinitions::default();
+pub fn add_fonts_to_ctx(egui_ctx: &egui::Context) {
+    use std::{collections::BTreeMap, sync::Arc};
 
-    // fonts.font_data.insert(
-    //     "Hack".to_owned(),
-    //     std::sync::Arc::new(
-    //         // .ttf and .otf supported
-    //         FontData::from_static(crate::fonts::HACK_REGULAR),
-    //     ),
-    // );
+    let mut font_data: BTreeMap<String, Arc<FontData>> = BTreeMap::new();
 
-    fonts.font_data.insert(
-        "Ubuntu-Light".to_owned(),
-        std::sync::Arc::new(
-            // .ttf and .otf supported
-            FontData::from_owned(font_raw_ubuntu),
-        ),
+    let mut families = BTreeMap::new();
+
+    #[cfg(feature = "font_hack")]
+    font_data.insert(
+        "Hack".to_owned(),
+        Arc::new(FontData::from_static(crate::fonts::HACK)),
     );
 
-    // fonts
-    //     .families
-    //     .get_mut(&FontFamily::Proportional)
-    //     .unwrap()
-    //     .insert(0, "Hack".to_owned());
+    // // Some good looking emojis. Use as first priority:
+    // font_data.insert(
+    //     "NotoEmoji-Regular".to_owned(),
+    //     Arc::new(FontData::from_static(crate::fonts::NOTO_EMOJI_REGULAR).tweak(FontTweak {
+    //         scale: 0.81, // Make smaller
+    //         ..Default::default()
+    //     })),
+    // );
 
-    // fonts
-    //     .families
-    //     .get_mut(&FontFamily::Monospace)
-    //     .unwrap()
-    //     .push("Hack".to_owned());
+    #[cfg(feature = "font_ubuntu_light")]
+    font_data.insert(
+        "Ubuntu-Light".to_owned(),
+        Arc::new(FontData::from_static(crate::fonts::UBUNTU_LIGHT)),
+    );
 
-    fonts
-        .families
-        .get_mut(&FontFamily::Proportional)
-        .unwrap()
-        .insert(0, "Ubuntu-Light".to_owned());
+    #[cfg(feature = "font_ubuntu_light_compressed")]
+    font_data.insert(
+        "Ubuntu-Light".to_owned(),
+        Arc::new(FontData::from_owned(crate::fonts::UBUNTU_LIGHT.to_vec())),
+    );
 
-    fonts
-        .families
-        .get_mut(&FontFamily::Monospace)
-        .unwrap()
-        .push("Ubuntu-Light".to_owned());
+    // // Bigger emojis, and more. <http://jslegers.github.io/emoji-icon-font/>:
+    // font_data.insert(
+    //     "emoji-icon-font".to_owned(),
+    //     Arc::new(FontData::from_static(crate::fonts::EMOJI_ICON).tweak(FontTweak {
+    //         scale: 0.90, // Make smaller
+    //         ..Default::default()
+    //     })),
+    // );
 
-    let egui_ctx = &cc.egui_ctx;
-    egui_ctx.set_fonts(fonts);
+    #[cfg(feature = "font_berkeley_mono")]
+    font_data.insert(
+        "BerkeleyMono".to_owned(),
+        Arc::new(FontData::from_static(crate::fonts::BERKELEY_MONO)),
+    );
+
+    families.insert(
+        FontFamily::Monospace,
+        vec![
+            #[cfg(feature = "font_berkeley_mono")]
+            "BerkeleyMono".to_owned(),
+            #[cfg(feature = "font_hack")]
+            "Hack".to_owned(),
+            #[cfg(feature = "font_ubuntu_light")]
+            "Ubuntu-Light".to_owned(),
+            // "NotoEmoji-Regular".to_owned(),
+            // "emoji-icon-font".to_owned(),
+        ],
+    );
+    families.insert(
+        FontFamily::Proportional,
+        vec![
+            #[cfg(feature = "font_berkeley_mono")]
+            "BerkeleyMono".to_owned(),
+            #[cfg(feature = "font_ubuntu_light")]
+            "Ubuntu-Light".to_owned(),
+            #[cfg(feature = "font_hack")]
+            "Hack".to_owned(),
+            // "NotoEmoji-Regular".to_owned(),
+            // "emoji-icon-font".to_owned(),
+        ],
+    );
+
+    let fd = FontDefinitions {
+        font_data,
+        families,
+    };
+
+    egui_ctx.set_fonts(fd);
 }

@@ -43,7 +43,9 @@ web-sys = { version = "0.3.77", features = [
     "StreamPipeOptions",
     "ReadableStreamDefaultReader",
     "BlobPropertyBag",
-    "Blob"
+    "Blob",
+    "Performance",
+    "Window"
   ] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
@@ -58,6 +60,15 @@ winit = { version = "0.30", features = ["android-native-activity"] }
 wgpu = "25.0"
 pollster = "0.4"
 android_logger = "0.15"
+
+
+[features]
+default = ["font_hack"]
+font_ubuntu_light = []
+font_ubuntu_light_compressed = []
+font_hack = []
+# berkeley mono does not contain the PI character, so you should also include a fallback font
+font_berkeley_mono = []
 
 
 [profile.release]

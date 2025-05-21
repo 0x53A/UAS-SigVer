@@ -202,6 +202,8 @@ fn _main(event_loop: EventLoop<UserEvent>) {
             .ok();
     });
 
+    add_fonts_to_ctx(ctx);
+
     let mut app_state = AppState {
         ctx,
         state: None,
@@ -248,7 +250,9 @@ pub fn main() {
         .parse_default_env()
         .init();
 
-    let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build().unwrap();
+    let event_loop = EventLoopBuilder::<UserEvent>::with_user_event()
+        .build()
+        .unwrap();
     _main(event_loop);
 }
 

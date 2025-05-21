@@ -1,3 +1,5 @@
+#![cfg(feature = "font_ubuntu_light_compressed")]
+
 use js_sys::{Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
