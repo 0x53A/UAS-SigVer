@@ -540,7 +540,8 @@ impl AliasApp {
             ui.add(
                 egui::Slider::new(&mut self.signal_frequency, 0.1..=10.0)
                     .text("Hz")
-                    .fixed_decimals(2),
+                    .fixed_decimals(2)
+                    .step_by(0.01),
             );
         });
 
@@ -550,7 +551,8 @@ impl AliasApp {
             ui.add(
                 egui::Slider::new(&mut self.sampling_frequency, 0.1..=20.0)
                     .text("Hz")
-                    .fixed_decimals(2),
+                    .fixed_decimals(2)
+                    .step_by(0.01),
             );
         });
 
