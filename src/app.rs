@@ -189,7 +189,7 @@ impl AliasApp {
 
             // 3. FFT of sampled points
             let (fft_size, fft_output) = self.calculate_fft();
-            let freq_resolution = self.sampling_frequency / fft_size as f32 / 2.0;
+            let freq_resolution = self.sampling_frequency / fft_size as f32;
             ui.colored_label(
                 Color32::YELLOW,
                 format!("FFT(n={fft_size}, resolution={freq_resolution:.4} Hz)"),
