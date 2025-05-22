@@ -1,5 +1,8 @@
 [app]
 name = "uas-sigver"
 stylized-name = "UAS SigVer"
-identifier = "com.x53a.uas_sigver"
+identifier = "com.x53a.uassigver"
 template-pack = "egui"
+
+[apple]
+development-team = "0x53A"

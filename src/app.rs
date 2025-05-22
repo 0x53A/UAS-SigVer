@@ -1,12 +1,21 @@
 use egui::{self, Color32, Stroke, vec2};
+use egui_typed_input::ValText;
 use rustfft::{FftPlanner, num_complex::Complex};
 use std::f32::consts::PI;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FFTSize {
+    Auto,
+    Custom(u32),
+}
 
 pub struct AliasApp {
     signal_frequency: f32,
     sampling_frequency: f32,
     /// the offset of the signal, between 0 and 2 (must be multiplied with π)
     offset: f32,
+
+    fft_size: FFTSize,
 
     planner: FftPlanner<f32>,
 
@@ -21,6 +30,7 @@ pub struct FFTMemoization {
     sampling_frequency: f32,
     signal_frequency: f32,
     offset: f32,
+    fft_signal_size: usize,
 
     // output
     fft_output: Vec<Complex<f32>>,
@@ -33,6 +43,7 @@ pub struct ReconstructedSignalMemoization {
     sampling_frequency: f32,
     signal_frequency: f32,
     offset: f32,
+    fft_len: usize,
 
     // output
     reconstructed_signal_output: Vec<(f32, f32)>,
@@ -74,8 +85,8 @@ impl Default for AliasApp {
             signal_frequency: 3.0,
             sampling_frequency: 10.0,
             offset: 0.0,
+            fft_size: FFTSize::Auto,
             planner: FftPlanner::new(),
-
             // manual memoization
             memo: AliasAppMemoization::default(),
 
@@ -86,7 +97,6 @@ impl Default for AliasApp {
 
 impl AliasApp {
     pub fn ui(&mut self, ctx: &egui::Context) {
-
         // performance: keep track of frame count and render time
         self.frame_count += 1;
         #[cfg(target_arch = "wasm32")]
@@ -217,10 +227,7 @@ impl AliasApp {
             // 4. Reconstructed signal
 
             // Create reconstructed signal
-            let recon_signal = self.calculate_reconstructed_signal(
-                horizontal_pixels,
-                &fft_output,
-            );
+            let recon_signal = self.calculate_reconstructed_signal(horizontal_pixels, &fft_output);
 
             self.render_reconstructed(
                 ui,
@@ -235,7 +242,7 @@ impl AliasApp {
             ui.add_space(15.0);
 
             // Add aliasing warning in its own area below the plot
-            if self.signal_frequency > self.sampling_frequency / 2.0 {
+            if self.signal_frequency >= self.sampling_frequency / 2.0 {
                 self.render_aliasing_warning(ui);
             } else {
                 // Add some empty space even when there's no warning
@@ -257,10 +264,22 @@ impl AliasApp {
 
 impl AliasApp {
     fn calculate_fft(&mut self) -> Vec<Complex<f32>> {
+        let fft_signal_size = match self.fft_size {
+            FFTSize::Auto => self.calculate_optimal_fft_size(),
+            FFTSize::Custom(size) => {
+                let mut s = size as usize;
+                if s % 2 != 0 {
+                    s += 1;
+                }
+                s
+            }
+        };
+
         match self.memo.fft {
             Some(ref mut memo)
                 if memo.sampling_frequency == self.sampling_frequency
                     && memo.signal_frequency == self.signal_frequency
+                    && memo.fft_signal_size == fft_signal_size
                     && memo.offset == self.offset =>
             {
                 // Use cached FFT output
@@ -268,11 +287,12 @@ impl AliasApp {
             }
             _ => {
                 // Calculate FFT and store in memoization
-                let fft_output = self._calculate_fft();
+                let fft_output = self._calculate_fft(fft_signal_size);
                 self.memo.fft = Some(FFTMemoization {
                     sampling_frequency: self.sampling_frequency,
                     signal_frequency: self.signal_frequency,
                     offset: self.offset,
+                    fft_signal_size,
                     fft_output: fft_output.clone(),
                 });
                 fft_output
@@ -281,15 +301,6 @@ impl AliasApp {
     }
 
     fn calculate_optimal_fft_size(&self) -> usize {
-        // let min = (self.sampling_frequency * 10.0) as usize;
-        // let max = (self.sampling_frequency * 15.0) as usize;
-        // (min..=max).into_iter().min_by_key(|n|{
-        //     let error_sample_rate = (*n as f32 / self.sampling_frequency) % 1.0;
-        //     let error_signal_rate = (*n as f32 / self.signal_frequency) % 1.0;
-        //     let err = error_sample_rate * error_sample_rate + error_signal_rate * error_signal_rate;
-        //     (err * 1000.0) as usize
-        // }).unwrap()
-
         let mut n = (20.0 * self.sampling_frequency) as usize;
         if n % 2 != 0 {
             n += 1;
@@ -297,8 +308,7 @@ impl AliasApp {
         n
     }
 
-    fn _calculate_fft(&mut self) -> Vec<Complex<f32>> {
-        let fft_signal_size = self.calculate_optimal_fft_size();
+    fn _calculate_fft(&mut self, fft_signal_size: usize) -> Vec<Complex<f32>> {
         // Use zero-padding at the beginning and end to reduce edge artifacts
         let n_padding = 0;
         let fft_size = fft_signal_size + 2 * n_padding;
@@ -363,21 +373,20 @@ impl AliasApp {
                 && memo.sampling_frequency == self.sampling_frequency
                 && memo.signal_frequency == self.signal_frequency
                 && memo.offset == self.offset
+                && memo.fft_len == fft_output.len()
             {
                 return memo.reconstructed_signal_output.clone();
             }
         }
 
-        let result = self._calculate_reconstructed_signal(
-            horizontal_pixels,
-            &fft_output,
-        );
+        let result = self._calculate_reconstructed_signal(horizontal_pixels, &fft_output);
 
         self.memo.reconstructed_signal = Some(ReconstructedSignalMemoization {
             horizontal_pixels,
             sampling_frequency: self.sampling_frequency,
             signal_frequency: self.signal_frequency,
             offset: self.offset,
+            fft_len: fft_output.len(),
             reconstructed_signal_output: result.clone(),
         });
 
@@ -403,26 +412,26 @@ impl AliasApp {
                 // Reconstruct from FFT data (Inverse Fourier transform simplified)
                 let mut y_value = 0.0;
 
-                // Calculate how many frequency components to include (up to Nyquist)
-                let nyquist_idx = (self.sampling_frequency / 2.0 / freq_resolution).ceil() as usize;
-                let display_components = nyquist_idx.min(fft_output.len() / 2);
-
                 // Use precise frequency reconstruction formula:
                 // y(t) = sum_k [ A_k * cos(2π*f_k*t + φ_k) ]
-                for k in 0..display_components {
-                    let freq = k as f32 * freq_resolution;
-
-                    // // Skip DC component (k=0) as it represents constant offset
-                    // if k == 0 {
-                    //     continue;
-                    // }
+                for k in 0..fft_size {
+                    // the FFT is mirrored
+                    let freq = if k <= fft_size / 2 {
+                        k as f32 * freq_resolution
+                    } else {
+                        (k as i32 - fft_size as i32) as f32 * freq_resolution
+                    };
 
                     // Get amplitude and phase from complex FFT output
                     let amplitude: f32 = fft_output[k].norm();
                     let phase: f32 = fft_output[k].arg();
 
                     // Add this frequency component's contribution at time x
-                    y_value += amplitude * (freq * x + phase).cos() / (fft_size as f32) * 2.0;
+                    if freq > 0.0 {
+                        y_value += amplitude * (freq * x + phase).cos() / (fft_size as f32);
+                    } else {
+                        y_value += amplitude * (-1.0 * freq * x - phase).cos() / (fft_size as f32);
+                    }
                 }
 
                 y_value
@@ -431,26 +440,6 @@ impl AliasApp {
             recon_signal.push((x, y));
         }
 
-        // // scale reconstructed signal
-        // let recon_min = recon_signal
-        //     .iter()
-        //     .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-        //     .unwrap()
-        //     .1;
-        // let recon_max = recon_signal
-        //     .iter()
-        //     .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-        //     .unwrap()
-        //     .1;
-
-        // let delta = recon_max - recon_min;
-        // let scale = 2.0 / delta;
-
-        // let half_point = recon_max - (delta / 2.0);
-
-        // for (x, y) in &mut recon_signal {
-        //     *y = (*y - half_point) * scale;
-        // }
         recon_signal
     }
 }
@@ -563,6 +552,33 @@ impl AliasApp {
                     .step_by(0.01),
             );
         });
+
+        ui.horizontal(|ui| {
+            ui.label("FFT Size:");
+            let mut is_checked = self.fft_size == FFTSize::Auto;
+            if ui
+                .add(egui::Checkbox::new(&mut is_checked, "Auto"))
+                .changed()
+            {
+                if is_checked {
+                    self.fft_size = FFTSize::Auto;
+                } else {
+                    self.fft_size = FFTSize::Custom(self.calculate_optimal_fft_size() as u32);
+                }
+            }
+            match self.fft_size {
+                FFTSize::Auto => {}
+                FFTSize::Custom(size) => {
+                    let mut number: ValText<u32, _> = ValText::number_uint();
+                    number.set_val(size);
+                    if ui.text_edit_singleline(&mut number).changed() {
+                        if let Some(Ok(num)) = number.get_val() {
+                            self.fft_size = FFTSize::Custom(*num);
+                        }
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -578,10 +594,7 @@ impl AliasApp {
     ) {
         ui.colored_label(
             Color32::YELLOW,
-            format!(
-                "Original signal ({}Hz) with sample points ({}Hz)",
-                self.signal_frequency, self.sampling_frequency
-            ),
+            format!("Signal ({}Hz)", self.signal_frequency),
         );
         let response1 = ui.allocate_rect(
             egui::Rect::from_min_size(ui.cursor().min, egui::Vec2::new(plot_width, plot_height)),
@@ -637,7 +650,7 @@ impl AliasApp {
             );
         }
 
-        draw_axis_labels(painter, rect, "Time", "Amplitude");
+        // draw_axis_labels(painter, rect, "Time", "Amplitude");
 
         // Add legend
         painter.rect_filled(
@@ -690,13 +703,7 @@ impl AliasApp {
         plot_width: f32,
         draw_axis_labels: impl Fn(&egui::Painter, egui::Rect, &str, &str),
     ) {
-        ui.colored_label(
-            Color32::YELLOW,
-            format!(
-                "Sample points only (Sampling rate: {}Hz)",
-                self.sampling_frequency
-            ),
-        );
+        ui.colored_label(Color32::YELLOW, format!("Sample points"));
         let response2 = ui.allocate_rect(
             egui::Rect::from_min_size(ui.cursor().min, egui::Vec2::new(plot_width, plot_height)),
             egui::Sense::hover(),
@@ -727,7 +734,7 @@ impl AliasApp {
             );
         }
 
-        draw_axis_labels(painter, rect, "Time", "Amplitude");
+        // draw_axis_labels(painter, rect, "Time", "Amplitude");
     }
 }
 
@@ -744,18 +751,12 @@ impl AliasApp {
 
         // Calculate how many points to display for 0-20Hz
         let freq_resolution = self.sampling_frequency / fft_size as f32;
-        let display_points = (max_display_freq / freq_resolution).ceil() as usize;
-        let display_points = display_points.min(fft_size / 2);
-        // Don't exceed Nyquist
 
         // Calculate magnitudes
-        let magnitudes: Vec<f32> = fft_output[..display_points]
+        let magnitudes: Vec<f32> = fft_output //[..display_points]
             .iter()
             .map(|c| c.norm() / fft_size as f32)
             .collect::<Vec<f32>>();
-
-        // Find maximum for scaling
-        // let max_magnitude = magnitudes.iter().fold(0.0f32, |a, &b| a.max(b));
 
         // Draw horizontal zero line
         painter.line_segment(
@@ -798,6 +799,76 @@ impl AliasApp {
             );
         }
 
+        // Mark signal frequency position
+        let signal_freq_pos = (self.signal_frequency / max_display_freq) * rect.width();
+        if signal_freq_pos <= rect.width() {
+            painter.line_segment(
+                [
+                    egui::Pos2::new(rect.left() + signal_freq_pos, rect.top()),
+                    egui::Pos2::new(rect.left() + signal_freq_pos, rect.bottom()),
+                ],
+                Stroke::new(1.0, Color32::RED),
+            );
+
+            painter.text(
+                egui::Pos2::new(rect.left() + signal_freq_pos, rect.top() + 15.0),
+                egui::Align2::CENTER_CENTER,
+                format!("{:.1} Hz", self.signal_frequency),
+                egui::FontId::proportional(12.0),
+                Color32::YELLOW,
+            );
+        }
+
+        // Add aliased frequency label if applicable
+        if self.signal_frequency > self.sampling_frequency / 2.0 {
+            let alias_freq = self.signal_frequency % self.sampling_frequency;
+            let alias_freq = if alias_freq > self.sampling_frequency / 2.0 {
+                self.sampling_frequency - alias_freq
+            } else {
+                alias_freq
+            };
+
+            let alias_pos = (alias_freq / max_display_freq) * rect.width();
+            if alias_pos <= rect.width() {
+                painter.line_segment(
+                    [
+                        egui::Pos2::new(rect.left() + alias_pos, rect.top()),
+                        egui::Pos2::new(rect.left() + alias_pos, rect.bottom()),
+                    ],
+                    Stroke::new(1.0, Color32::from_rgb(128, 0, 128)), // Purple
+                );
+
+                painter.text(
+                    egui::Pos2::new(rect.left() + alias_pos + 50.0, rect.top() + 30.0),
+                    egui::Align2::CENTER_CENTER,
+                    format!("Alias: {alias_freq:.1} Hz"),
+                    egui::FontId::proportional(12.0),
+                    Color32::RED,
+                );
+            }
+        }
+
+        // Mark Nyquist frequency if it's in our display range
+        let nyquist_freq = self.sampling_frequency / 2.0;
+        if nyquist_freq <= max_display_freq {
+            let nyquist_pos = (nyquist_freq / max_display_freq) * rect.width();
+            painter.line_segment(
+                [
+                    egui::Pos2::new(rect.left() + nyquist_pos, rect.top()),
+                    egui::Pos2::new(rect.left() + nyquist_pos, rect.bottom()),
+                ],
+                Stroke::new(1.0, Color32::from_rgba_premultiplied(255, 255, 0, 100)),
+            );
+
+            painter.text(
+                egui::Pos2::new(rect.left() + nyquist_pos, rect.bottom() - 5.0),
+                egui::Align2::CENTER_BOTTOM,
+                format!("Nyquist: {nyquist_freq:.1} Hz"),
+                egui::FontId::proportional(12.0),
+                Color32::YELLOW,
+            );
+        }
+
         // Draw FFT bars
         if !magnitudes.is_empty() {
             // For each display bucket, position it according to its frequency
@@ -824,79 +895,9 @@ impl AliasApp {
                     Color32::LIGHT_BLUE,
                 );
             }
-
-            // Mark signal frequency position
-            let signal_freq_pos = (self.signal_frequency / max_display_freq) * rect.width();
-            if signal_freq_pos <= rect.width() {
-                painter.line_segment(
-                    [
-                        egui::Pos2::new(rect.left() + signal_freq_pos, rect.top()),
-                        egui::Pos2::new(rect.left() + signal_freq_pos, rect.bottom()),
-                    ],
-                    Stroke::new(1.0, Color32::RED),
-                );
-
-                painter.text(
-                    egui::Pos2::new(rect.left() + signal_freq_pos, rect.top() + 15.0),
-                    egui::Align2::CENTER_CENTER,
-                    format!("{:.1} Hz", self.signal_frequency),
-                    egui::FontId::proportional(12.0),
-                    Color32::YELLOW,
-                );
-            }
-
-            // Add aliased frequency label if applicable
-            if self.signal_frequency > self.sampling_frequency / 2.0 {
-                let alias_freq = self.signal_frequency % self.sampling_frequency;
-                let alias_freq = if alias_freq > self.sampling_frequency / 2.0 {
-                    self.sampling_frequency - alias_freq
-                } else {
-                    alias_freq
-                };
-
-                let alias_pos = (alias_freq / max_display_freq) * rect.width();
-                if alias_pos <= rect.width() {
-                    painter.line_segment(
-                        [
-                            egui::Pos2::new(rect.left() + alias_pos, rect.top()),
-                            egui::Pos2::new(rect.left() + alias_pos, rect.bottom()),
-                        ],
-                        Stroke::new(1.0, Color32::from_rgb(128, 0, 128)), // Purple
-                    );
-
-                    painter.text(
-                        egui::Pos2::new(rect.left() + alias_pos + 50.0, rect.top() + 30.0),
-                        egui::Align2::CENTER_CENTER,
-                        format!("Alias: {alias_freq:.1} Hz"),
-                        egui::FontId::proportional(12.0),
-                        Color32::RED,
-                    );
-                }
-            }
         }
 
-        draw_axis_labels(painter, rect, "Frequency (Hz)", "Magnitude");
-
-        // Mark Nyquist frequency if it's in our display range
-        let nyquist_freq = self.sampling_frequency / 2.0;
-        if nyquist_freq <= max_display_freq {
-            let nyquist_pos = (nyquist_freq / max_display_freq) * rect.width();
-            painter.line_segment(
-                [
-                    egui::Pos2::new(rect.left() + nyquist_pos, rect.top()),
-                    egui::Pos2::new(rect.left() + nyquist_pos, rect.bottom()),
-                ],
-                Stroke::new(1.0, Color32::from_rgba_premultiplied(255, 255, 0, 100)),
-            );
-
-            painter.text(
-                egui::Pos2::new(rect.left() + nyquist_pos, rect.bottom() - 5.0),
-                egui::Align2::CENTER_BOTTOM,
-                format!("Nyquist: {nyquist_freq:.1} Hz"),
-                egui::FontId::proportional(12.0),
-                Color32::YELLOW,
-            );
-        }
+        // draw_axis_labels(painter, rect, "Frequency (Hz)", "Magnitude");
     }
 }
 
@@ -910,13 +911,7 @@ impl AliasApp {
         draw_axis_labels: impl Fn(&egui::Painter, egui::Rect, &str, &str),
         recon_signal: Vec<(f32, f32)>,
     ) {
-        ui.colored_label(
-            Color32::YELLOW,
-            format!(
-                "Reconstructed signal ({}Hz sampling)",
-                self.sampling_frequency
-            ),
-        );
+        ui.colored_label(Color32::YELLOW, format!("Reconstructed signal"));
         let response4 = ui.allocate_rect(
             egui::Rect::from_min_size(ui.cursor().min, egui::Vec2::new(plot_width, plot_height)),
             egui::Sense::hover(),
@@ -991,7 +986,7 @@ impl AliasApp {
             );
         }
 
-        draw_axis_labels(painter, rect, "Time", "Amplitude");
+        // draw_axis_labels(painter, rect, "Time", "Amplitude");
 
         // Add legend
         painter.rect_filled(

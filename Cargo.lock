@@ -605,6 +605,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui-typed-input"
+version = "0.1.0"
+source = "git+https://github.com/TimTheBig/egui_typed_input#736a7256e248a5dad2171131d10e1916848033b5"
+dependencies = [
+ "egui",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "egui-wgpu"
 version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2482,6 +2491,7 @@ dependencies = [
  "android_logger",
  "eframe",
  "egui",
+ "egui-typed-input",
  "egui-wgpu",
  "egui-winit",
  "env_logger",
