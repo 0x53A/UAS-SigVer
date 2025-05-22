@@ -48,7 +48,7 @@ web-sys = { version = "0.3.77", features = [
     "Window"
   ] }
 
-[target.'cfg(target_os = "windows")'.dependencies]
+[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 eframe = { version = "0.31.1", default-features = false, features = [ "glow" ] } # you can see the default features here: https://github.com/emilk/egui/blob/master/crates/eframe/Cargo.toml#L34
 egui = { version = "0.31.1", default-features = false }
 
