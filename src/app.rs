@@ -23,7 +23,7 @@ pub struct FFTMemoization {
     offset: f32,
 
     // output
-    fft_output: (usize, Vec<Complex<f32>>),
+    fft_output: Vec<Complex<f32>>,
 }
 
 #[derive(Clone, Default)]
@@ -33,7 +33,6 @@ pub struct ReconstructedSignalMemoization {
     sampling_frequency: f32,
     signal_frequency: f32,
     offset: f32,
-    fft_size: usize,
 
     // output
     reconstructed_signal_output: Vec<(f32, f32)>,
@@ -87,6 +86,8 @@ impl Default for AliasApp {
 
 impl AliasApp {
     pub fn ui(&mut self, ctx: &egui::Context) {
+
+        // performance: keep track of frame count and render time
         self.frame_count += 1;
         #[cfg(target_arch = "wasm32")]
         let (performance, render_start_time) = {
@@ -100,6 +101,7 @@ impl AliasApp {
         };
         #[cfg(not(target_arch = "wasm32"))]
         let render_start_time = std::time::Instant::now();
+
         egui::CentralPanel::default().show(ctx, |ui| {
             // Set dark mode
             ui.ctx().set_visuals(egui::Visuals::dark());
@@ -188,7 +190,8 @@ impl AliasApp {
             draw_separator(ui);
 
             // 3. FFT of sampled points
-            let (fft_size, fft_output) = self.calculate_fft();
+            let fft_output = self.calculate_fft();
+            let fft_size = fft_output.len();
             let freq_resolution = self.sampling_frequency / fft_size as f32;
             ui.colored_label(
                 Color32::YELLOW,
@@ -216,9 +219,7 @@ impl AliasApp {
             // Create reconstructed signal
             let recon_signal = self.calculate_reconstructed_signal(
                 horizontal_pixels,
-                fft_size,
                 &fft_output,
-                freq_resolution,
             );
 
             self.render_reconstructed(
@@ -255,7 +256,7 @@ impl AliasApp {
 }
 
 impl AliasApp {
-    fn calculate_fft(&mut self) -> (usize, Vec<Complex<f32>>) {
+    fn calculate_fft(&mut self) -> Vec<Complex<f32>> {
         match self.memo.fft {
             Some(ref mut memo)
                 if memo.sampling_frequency == self.sampling_frequency
@@ -267,14 +268,14 @@ impl AliasApp {
             }
             _ => {
                 // Calculate FFT and store in memoization
-                let (fft_size, fft_output) = self._calculate_fft();
+                let fft_output = self._calculate_fft();
                 self.memo.fft = Some(FFTMemoization {
                     sampling_frequency: self.sampling_frequency,
                     signal_frequency: self.signal_frequency,
                     offset: self.offset,
-                    fft_output: (fft_size, fft_output.clone()),
+                    fft_output: fft_output.clone(),
                 });
-                (fft_size, fft_output)
+                fft_output
             }
         }
     }
@@ -296,7 +297,7 @@ impl AliasApp {
         n
     }
 
-    fn _calculate_fft(&mut self) -> (usize, Vec<Complex<f32>>) {
+    fn _calculate_fft(&mut self) -> Vec<Complex<f32>> {
         let fft_signal_size = self.calculate_optimal_fft_size();
         // Use zero-padding at the beginning and end to reduce edge artifacts
         let n_padding = 0;
@@ -347,7 +348,7 @@ impl AliasApp {
         let fft = planner.plan_fft_forward(fft_size);
         let mut fft_output = fft_input.clone();
         fft.process(&mut fft_output);
-        (fft_size, fft_output)
+        fft_output
     }
 }
 
@@ -355,16 +356,13 @@ impl AliasApp {
     fn calculate_reconstructed_signal(
         &mut self,
         horizontal_pixels: u32,
-        fft_size: usize,
         fft_output: &Vec<Complex<f32>>,
-        freq_resolution: f32,
     ) -> Vec<(f32, f32)> {
         if let Some(ref memo) = self.memo.reconstructed_signal {
             if memo.horizontal_pixels == horizontal_pixels
                 && memo.sampling_frequency == self.sampling_frequency
                 && memo.signal_frequency == self.signal_frequency
                 && memo.offset == self.offset
-                && memo.fft_size == fft_size
             {
                 return memo.reconstructed_signal_output.clone();
             }
@@ -372,9 +370,7 @@ impl AliasApp {
 
         let result = self._calculate_reconstructed_signal(
             horizontal_pixels,
-            fft_size,
-            &fft_output, // Pass by reference to the private method
-            freq_resolution,
+            &fft_output,
         );
 
         self.memo.reconstructed_signal = Some(ReconstructedSignalMemoization {
@@ -382,7 +378,6 @@ impl AliasApp {
             sampling_frequency: self.sampling_frequency,
             signal_frequency: self.signal_frequency,
             offset: self.offset,
-            fft_size,
             reconstructed_signal_output: result.clone(),
         });
 
@@ -392,12 +387,14 @@ impl AliasApp {
     fn _calculate_reconstructed_signal(
         &mut self,
         horizontal_pixels: u32,
-        fft_size: usize,
         fft_output: &Vec<Complex<f32>>,
-        freq_resolution: f32,
     ) -> Vec<(f32, f32)> {
         let n_recon_points = horizontal_pixels as usize;
         let mut recon_signal = Vec::with_capacity(n_recon_points);
+        let fft_size = fft_output.len();
+        let freq_resolution = self.sampling_frequency / fft_size as f32;
+
+        assert!(fft_output.len() % 2 == 0);
 
         for i in 0..n_recon_points {
             let x = i as f32 / n_recon_points as f32 * 2.0 * PI;
