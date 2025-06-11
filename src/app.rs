@@ -21,6 +21,8 @@ pub struct AliasApp {
 
     memo: AliasAppMemoization,
 
+    show_raw_fft_values: bool,
+
     frame_count: u64,
 }
 
@@ -89,7 +91,7 @@ impl Default for AliasApp {
             planner: FftPlanner::new(),
             // manual memoization
             memo: AliasAppMemoization::default(),
-
+            show_raw_fft_values: false,
             frame_count: 0,
         }
     }
@@ -203,10 +205,20 @@ impl AliasApp {
             let fft_output = self.calculate_fft();
             let fft_size = fft_output.len();
             let freq_resolution = self.sampling_frequency / fft_size as f32;
-            ui.colored_label(
-                Color32::YELLOW,
-                format!("FFT(n={fft_size}, resolution={freq_resolution:.4} Hz)"),
-            );
+            // ui.colored_label(
+            //     Color32::YELLOW,
+            //     format!("FFT(n={fft_size}, resolution={freq_resolution:.4} Hz)"),
+            // );
+            ui.horizontal(|ui| {
+                ui.colored_label(
+                    Color32::YELLOW,
+                    format!("FFT(n={fft_size}, resolution={freq_resolution:.4} Hz)"),
+                );
+
+                if ui.small_button("raw values").clicked() {
+                    self.show_raw_fft_values = !self.show_raw_fft_values;
+                }
+            });
             let response3 = ui.allocate_rect(
                 egui::Rect::from_min_size(
                     ui.cursor().min,
@@ -220,6 +232,10 @@ impl AliasApp {
 
             // Define fixed frequency range (0 to 20 Hz)
             self.render_fft(draw_axis_labels, rect, painter, fft_size, &fft_output);
+
+            if self.show_raw_fft_values {
+                self.render_fft_raw_values(ctx, ui, &fft_output);
+            }
 
             ui.add_space(5.0);
             draw_separator(ui);
@@ -898,6 +914,68 @@ impl AliasApp {
         }
 
         // draw_axis_labels(painter, rect, "Frequency (Hz)", "Magnitude");
+    }
+}
+
+impl AliasApp {
+    fn render_fft_raw_values(
+        &mut self,
+        ctx: &egui::Context,
+        ui: &mut egui::Ui,
+        fft_output: &Vec<Complex<f32>>,
+    ) {
+        let fft_size = fft_output.len();
+        let freq_resolution = self.sampling_frequency / fft_size as f32;
+
+        egui::Window::new("Raw FFT Values")
+            .open(&mut self.show_raw_fft_values)
+            .resizable(true)
+            .default_width(400.0)
+            .max_height(600.0)
+            .show(ctx, |ui| {
+                ui.label(format!("FFT Size: {}", fft_size));
+                ui.label(format!("Frequency Resolution: {:.4} Hz", freq_resolution));
+                ui.separator();
+
+                egui::ScrollArea::vertical()
+                    .max_height(500.0)
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Bin");
+                            ui.separator();
+                            ui.label("Frequency (Hz)");
+                            ui.separator();
+                            ui.label("Real");
+                            ui.separator();
+                            ui.label("Imaginary");
+                            ui.separator();
+                            ui.label("Magnitude / N");
+                            ui.separator();
+                            ui.label("Phase (rad) / π");
+                        });
+                        ui.separator();
+
+                        for (i, complex_val) in fft_output.iter().enumerate() {
+                            let freq = i as f32 * freq_resolution;
+                            let magnitude = complex_val.norm() / fft_size as f32;
+                            let phase = complex_val.arg() / PI;
+
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{:4}", i));
+                                ui.separator();
+                                ui.label(format!("{:8.3}", freq));
+                                ui.separator();
+                                ui.label(format!("{:10.6}", complex_val.re));
+                                ui.separator();
+                                ui.label(format!("{:10.6}", complex_val.im));
+                                ui.separator();
+                                ui.label(format!("{:10.6}", magnitude));
+                                ui.separator();
+                                ui.label(format!("{:8.3}", phase));
+                            });
+                        }
+                    });
+            });
     }
 }
 
