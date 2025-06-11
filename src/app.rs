@@ -898,7 +898,7 @@ impl AliasApp {
                 // Calculate width based on frequency resolution
                 let next_freq = (i_bucket + 1) as f32 * freq_resolution;
                 let next_x = rect.left() + (next_freq / max_display_freq) * rect.width();
-                let bucket_width = next_x - x;
+                let bucket_width = f32::max(next_x - x, 1.0);
 
                 let y = magnitudes[i_bucket] * 2.0 * rect.height();
 
