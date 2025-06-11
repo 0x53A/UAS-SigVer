@@ -35,6 +35,9 @@ jobs:
       - name: Fetch submodules
         run: git submodule update --init --recursive
 
+      - name: Restore Git Config
+        run: git config --global --unset url."git@github.com:".insteadOf
+
       - name: Setup toolchain for wasm
         run: |
           rustup update nightly
