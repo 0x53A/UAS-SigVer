@@ -22,4 +22,4 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run cargo check on app
-        run: cargo check --no-default-features --features font_hack
+        run: cargo check --target wasm32-unknown-unknown --no-default-features --features font_hack

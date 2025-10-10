@@ -1,7 +1,7 @@
 [package]
 name = "uas-sigver"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [[bin]]
 name = "uas-sigver-bin"
@@ -51,6 +51,10 @@ web-sys = { version = "0.3.80", features = [
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 eframe = { version = "0.32.3", default-features = false, features = [ "glow" ] } # you can see the default features here: https://github.com/emilk/egui/blob/master/crates/eframe/Cargo.toml#L34
+egui = { version = "0.32.3", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+eframe = { version = "0.32.3", default-features = false, features = [ "glow" ] }
 egui = { version = "0.32.3", default-features = false }
 
 [target.'cfg(target_os = "android")'.dependencies]
