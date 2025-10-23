@@ -24,7 +24,7 @@ app-theme-parent = "Theme.MaterialComponents.DayNight.DarkActionBar"
 egui-typed-input = { git = "https://github.com/TimTheBig/egui_typed_input", version = "0.1.0" }
 env_logger = "0.11.8"
 log = "0.4.28"
-ordered-float = "5.0.0"
+ordered-float = "5.1.0"
 rustfft = { version = "6.4.1", features = ["wasm_simd"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -58,7 +58,7 @@ egui = { version = "0.32", default-features = false, features = [ "default_fonts
 egui-winit = { version = "0.32", default-features = false }
 egui-wgpu = { version = "0.32", features = [ "winit" ] }
 winit = { version = "0.30", features = ["android-native-activity"] }
-wgpu = "26.0"
+wgpu = "27.0"
 pollster = "0.4"
 android_logger = "0.15"
 
