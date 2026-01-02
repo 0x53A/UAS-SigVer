@@ -23,7 +23,7 @@ app-theme-parent = "Theme.MaterialComponents.DayNight.DarkActionBar"
 [dependencies]
 egui-typed-input = { git = "https://github.com/TimTheBig/egui_typed_input", version = "0.1.0" }
 env_logger = "0.11.8"
-log = "0.4.28"
+log = "0.4.29"
 ordered-float = "5.1.0"
 rustfft = { version = "6.4.1", features = ["wasm_simd"] }
 
@@ -32,7 +32,7 @@ eframe = { version = "0.32", default-features = false, features = [ "glow" ] } #
 egui = { version = "0.32", default-features = false }
 js-sys = "0.3.80"
 wasm-bindgen = "0.2.103"
-wasm-bindgen-futures = "0.4.54"
+wasm-bindgen-futures = "0.4.56"
 web-sys = { version = "0.3.80", features = [
     "ResponseInit",
     "DecompressionStream",
