@@ -57,10 +57,12 @@ jobs:
 
       - name: Prepare deployment folder
         run: |
-          mkdir -p dist
+          mkdir dist
+          mkdir dist/assets
+          mkdir dist/pkg
           cp index.html dist/
-          cp -r assets dist/
-          cp -r pkg dist/
+          cp assets/* dist/assets/
+          cp pkg/* dist/pkg/
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
