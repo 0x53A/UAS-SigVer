@@ -35,3 +35,93 @@ pub const HACK: &[u8] = include_bytes!("../fonts/Hack-Regular.ttf");
 pub const BERKELEY_MONO: &[u8] = include_bytes!(
     "../fonts/berkeley-mono/v2/250521L627KKV86L/TX-02-Y6N88QJ9/BerkeleyMono-Regular.ttf"
 );
+
+
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub fn add_fonts_to_ctx(egui_ctx: &egui::Context) {
+    use std::{collections::BTreeMap, sync::Arc};
+    use egui::FontData;
+    use egui::FontFamily;
+    use egui::FontDefinitions;
+
+    let mut font_data: BTreeMap<String, Arc<FontData>> = BTreeMap::new();
+
+    let mut families = BTreeMap::new();
+
+    #[cfg(feature = "font_hack")]
+    font_data.insert(
+        "Hack".to_owned(),
+        Arc::new(FontData::from_static(crate::fonts::HACK)),
+    );
+
+    // // Some good looking emojis. Use as first priority:
+    // font_data.insert(
+    //     "NotoEmoji-Regular".to_owned(),
+    //     Arc::new(FontData::from_static(crate::fonts::NOTO_EMOJI_REGULAR).tweak(FontTweak {
+    //         scale: 0.81, // Make smaller
+    //         ..Default::default()
+    //     })),
+    // );
+
+    #[cfg(feature = "font_ubuntu_light")]
+    font_data.insert(
+        "Ubuntu-Light".to_owned(),
+        Arc::new(FontData::from_static(crate::fonts::UBUNTU_LIGHT)),
+    );
+
+    #[cfg(feature = "font_ubuntu_light_compressed")]
+    font_data.insert(
+        "Ubuntu-Light".to_owned(),
+        Arc::new(FontData::from_owned(crate::fonts::UBUNTU_LIGHT.to_vec())),
+    );
+
+    // // Bigger emojis, and more. <http://jslegers.github.io/emoji-icon-font/>:
+    // font_data.insert(
+    //     "emoji-icon-font".to_owned(),
+    //     Arc::new(FontData::from_static(crate::fonts::EMOJI_ICON).tweak(FontTweak {
+    //         scale: 0.90, // Make smaller
+    //         ..Default::default()
+    //     })),
+    // );
+
+    #[cfg(feature = "font_berkeley_mono")]
+    font_data.insert(
+        "BerkeleyMono".to_owned(),
+        Arc::new(FontData::from_static(crate::fonts::BERKELEY_MONO)),
+    );
+
+    families.insert(
+        FontFamily::Monospace,
+        vec![
+            #[cfg(feature = "font_berkeley_mono")]
+            "BerkeleyMono".to_owned(),
+            #[cfg(feature = "font_hack")]
+            "Hack".to_owned(),
+            #[cfg(feature = "font_ubuntu_light")]
+            "Ubuntu-Light".to_owned(),
+            // "NotoEmoji-Regular".to_owned(),
+            // "emoji-icon-font".to_owned(),
+        ],
+    );
+    families.insert(
+        FontFamily::Proportional,
+        vec![
+            #[cfg(feature = "font_berkeley_mono")]
+            "BerkeleyMono".to_owned(),
+            #[cfg(feature = "font_ubuntu_light")]
+            "Ubuntu-Light".to_owned(),
+            #[cfg(feature = "font_hack")]
+            "Hack".to_owned(),
+            // "NotoEmoji-Regular".to_owned(),
+            // "emoji-icon-font".to_owned(),
+        ],
+    );
+
+    let fd = FontDefinitions {
+        font_data,
+        families,
+    };
+
+    egui_ctx.set_fonts(fd);
+}

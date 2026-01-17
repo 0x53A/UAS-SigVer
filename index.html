@@ -9,23 +9,9 @@
     <!-- change this to your project name -->
     <title>UAS SigVer: Aliasing Demonstration</title>
 
-    <!-- config for our rust wasm binary. go to https://trunkrs.dev/assets/#rust for more customization -->
-    <link data-trunk rel="rust" data-bin="uas-sigver-bin" data-wasm-opt="z" data-wasm-opt-params="--enable-bulk-memory --enable-nontrapping-float-to-int" />
-    <!-- this is the base url relative to which other urls will be constructed. trunk will insert this from the public-url option -->
-    <base data-trunk-public-url />
-
-    <link data-trunk rel="icon" href="assets/favicon.ico">
-
-
-    <link data-trunk rel="copy-file" href="assets/sw.js"/>
-    <link data-trunk rel="copy-file" href="assets/manifest.json"/>
-    <link data-trunk rel="copy-file" href="assets/icon-1024.png" data-target-path="assets"/>
-    <link data-trunk rel="copy-file" href="assets/icon-256.png" data-target-path="assets"/>
-    <link data-trunk rel="copy-file" href="assets/icon_ios_touch_192.png" data-target-path="assets"/>
-    <link data-trunk rel="copy-file" href="assets/maskable_icon_x512.png" data-target-path="assets"/>
-
-
-    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="assets/favicon.ico">
+    
+    <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icon_ios_touch_192.png">
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#404040">
@@ -60,8 +46,8 @@
             width: 100%;
         }
 
-        /* Make canvas fill entire document: */
-        canvas {
+        /* Make the custom element fill entire document: */
+        uas-sigver {
             margin-right: auto;
             margin-left: auto;
             display: block;
@@ -119,11 +105,10 @@
 </head>
 
 <body>
-    <!-- The WASM code will resize the canvas dynamically -->
-    <!-- the id is hardcoded in main.rs . so, make sure both match. -->
-    <canvas id="the_canvas_id"></canvas>
+    <!-- The web component will be created by the wasm module -->
+    <uas-sigver id="app"></uas-sigver>
 
-    <!-- the loading spinner will be removed in main.rs -->
+    <!-- the loading spinner will be removed when the wasm module loads -->
     <div class="centered" id="loading_text">
         <p style="font-size:16px">
             Loading…
@@ -131,15 +116,28 @@
         <div class="lds-dual-ring"></div>
     </div>
 
-    <!--Register Service Worker. this will cache the wasm / js scripts for offline use (for PWA functionality). -->
-    <!-- Force refresh (Ctrl + F5) to load the latest files instead of cached files  -->
-    <script>
-        // We disable caching during development so that we always view the latest version.
-        if ('serviceWorker' in navigator && window.location.hash !== "#dev") {
-            window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js');
-            });
+    <!-- Load the wasm-pack generated module -->
+    <script type="module">
+        import init from './pkg/uas_sigver.js';
+
+        async function run() {
+            try {
+                await init();
+                // Remove loading spinner after successful initialization
+                const loadingText = document.getElementById('loading_text');
+                if (loadingText) {
+                    loadingText.remove();
+                }
+            } catch (e) {
+                console.error('Failed to initialize WASM module:', e);
+                const loadingText = document.getElementById('loading_text');
+                if (loadingText) {
+                    loadingText.innerHTML = '<p>The app has crashed. See the developer console for details.</p>';
+                }
+            }
         }
+
+        run();
     </script>
 </body>
 

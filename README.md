@@ -1,19 +1,22 @@
 ## Web
 
-```
+```sh
 # one time
-cargo install --locked trunk
+cargo install wasm-pack
 
-# debug (http://127.0.0.1:8080)
-trunk serve 
+# build debug
+wasm-pack build --target web --dev
 
-# release (/dist folder)
-trunk build --release
+# serve locally (or just open the html file directly)
+python -m http.server 8080
+
+# build release
+wasm-pack build --target web --release
 ```
 
 ## Windows
 
-```
+```sh
 # debug
 cargo run
 
@@ -23,7 +26,7 @@ cargo build --release
 
 ## Android
 
-```
+```sh
 # one time
 cargo install --git https://github.com/tauri-apps/cargo-mobile2
 # once after clone (or clean) to create the /gen/ folder
