@@ -1,0 +1,15 @@
+{
+  "name": "uas-sigver",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "uas_sigver_bg.wasm",
+    "uas_sigver.js",
+    "uas_sigver.d.ts"
+  ],
+  "main": "uas_sigver.js",
+  "types": "uas_sigver.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
